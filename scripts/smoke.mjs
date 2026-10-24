@@ -50,8 +50,14 @@ try {
   let second;
   let third;
   await step('1 upload and duplicate detection', async () => {
-    first = await add(`${prefix}-one.png`);
-    const duplicate = await json('/api/upload',{method:'POST',bytes:first.bytes,bearer:true,headers:{'X-Content-Sha256':sha(first.bytes)}});
+    first = await add(`${prefix}-one space-ছবি.png`, undefined, 'image/png');
+    check(first.file.width === 64 && first.file.height === 64 && first.file.name === `${prefix}-one space-ছবি.png`, 'Browser dimensions or encoded name were not stored.');
+    const browserHeaders = { 'Content-Type': 'image/png', 'X-File-Name': encodeURIComponent(first.file.name), 'X-Content-Sha256': sha(first.bytes), 'X-Width': '64', 'X-Height': '64' };
+    const batchHashes = [first.bytes, first.bytes].map(sha);
+    const uniqueHashes = [...new Set(batchHashes)];
+    const batchCheck = await json('/api/upload/check', { method: 'POST', json: { hashes: uniqueHashes } });
+    check(uniqueHashes.length === 1 && batchCheck.existing[uniqueHashes[0]] === first.file.id, 'Duplicate-in-batch preflight failed.');
+    const duplicate = await json('/api/upload',{method:'POST',bytes:first.bytes,headers:browserHeaders});
     check(duplicate.duplicate && duplicate.file.id === first.file.id, 'Duplicate detection failed.');
   });
   await step('2 preflight and rejected upload validation', async () => {

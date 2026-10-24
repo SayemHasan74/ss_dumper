@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { items, loadMore, loadMoreError, nextCursor, status } from '../store/files';
+import { galleryItems as items, loadMore, loadMoreError, nextCursor, status } from '../store/files';
 import { gridMetrics } from '../store/ui';
 import { openViewer, route } from '../lib/router';
 import { Cell } from './Cell';
@@ -68,7 +68,7 @@ export function VirtualGrid() {
     if (!files.length) return;
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-file-id]');
     const index = target ? files.findIndex((file) => file.id === target.dataset.fileId) : Math.min(focused, files.length - 1);
-    if (event.key === 'Enter') { event.preventDefault(); openViewer(files[index].id, target ?? event.currentTarget); return; }
+    if (event.key === 'Enter') { event.preventDefault(); if (!('localId' in files[index])) openViewer(files[index].id, target ?? event.currentTarget); return; }
     const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -layout.cols, ArrowDown: layout.cols };
     if (moves[event.key] === undefined) return;
     event.preventDefault(); keyboard.current = true;

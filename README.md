@@ -1,6 +1,6 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–4 provide the foundation, secure sign-in, authenticated file API, virtualized gallery, filters/search and full-screen image/PDF viewer. Upload UI arrives in Part 5; selection, copying and file actions arrive in Part 6.
+Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–5 provide secure sign-in, the file API, virtualized gallery, filters/search, image/PDF viewer and uploads with local thumbnails. Selection, copying and file actions arrive in Part 6.
 
 Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
 
@@ -45,6 +45,18 @@ Remove-Item Env:SMOKE_UPLOAD_TOKEN
 ```
 
 The default count is 300; use 5000 for the larger scrolling check. The script creates unique 64×64 PNGs, four uploads at a time, and prints counts only. HTTPS targets are refused unless `--force` is explicitly supplied, since each upload consumes live KV write quota. The script never runs in CI. Part 4 measurements and test limits are recorded in [the verification report](docs/verification/part-4.md).
+
+## Uploading
+
+Tap the round + button to choose up to 100 PNG, JPEG, WebP, GIF or PDF files, each at most 25 MiB. On iPhone, the native Photo Library / Take Photo / Choose Files sheet appears once, followed by the normal multi-select picker. The file input opens through its native label, without a JavaScript `input.click()`. HEIC/HEIF is excluded; iOS can convert photos to JPEG for the supported picker types. A real iPhone/Safari check is still needed; local verification uses touch emulation in Edge Chromium.
+
+On desktop, drop files anywhere in the app or paste images while focus is outside an editor. New cells appear immediately. Images get a local JPEG thumbnail (480 px longest side, quality 0.82, white background); generic photo-picker names become `screenshot-…`, and pasted images become `pasted-…`. PDF originals have no thumbnail. SHA-256 and a batched preflight skip duplicates before uploading; the server also checks duplicates.
+
+The upload tray sits above +. Tap its summary to inspect file progress, retry failed files, cancel work or clear finished entries. Upload concurrency is three, or two for a slow/data-saving connection; hashing and thumbnail preparation share two slots. The queue waits offline and resumes on reconnect. If a session expires, sign in again to resume the same in-memory files. Closing/reloading the tab loses this queue, so an unfinished queue triggers the browser's leave-page warning. A screen wake lock is requested when supported; browsers may deny or release it, and background suspension can still interrupt work.
+
+Network/timeouts and retryable responses have at most three retries with backoff. Daily quota exhaustion stops the queue and offers manual Retry after the quota resets. A full storage response also stops the queue. If an original succeeds but its thumbnail fails, the original remains added. When uploads are idle and the app is visible/online, a background job fills missing image thumbnails one at a time (originals up to 15 MiB, at most two attempts per image per signed-in session). A daily-limit response stops backfill for that session.
+
+Preview URLs remain in memory for the signed-in session to hide storage propagation delays. Cancellation/clearing a local item revokes its preview; sign-out revokes all local and completed previews. Nothing in the queue is saved to browser storage. Images generally cost two KV writes, originals plus thumbnails. See [Part 5 verification](docs/verification/part-5.md) for measured behavior and limitations.
 
 ## File API and free-plan storage
 

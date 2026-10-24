@@ -1,0 +1,9 @@
+import { enqueue } from '../upload/queue';
+import { Icon } from './Icon';
+
+export function Fab() {
+  return <div class="upload-picker"><input id="upload-files" class="upload-input" type="file" aria-label="Add files" multiple accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" onChange={(event) => {
+    const input = event.currentTarget;
+    const files = [...(input.files ?? [])]; input.value = ''; enqueue(files);
+  }} /><label class="upload-fab" htmlFor="upload-files" aria-label="Add files"><Icon name="plus" size={28} /></label></div>;
+}

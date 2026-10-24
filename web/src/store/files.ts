@@ -1,4 +1,4 @@
-import { batch, effect, signal, untracked } from '@preact/signals';
+import { batch, computed, effect, signal, untracked } from '@preact/signals';
 import type { FileDTO, SettingsDTO } from '../../../shared/types';
 import { authState } from '../auth';
 import { api } from '../lib/api';
@@ -13,6 +13,32 @@ export const loadMoreError = signal('');
 export const tags = signal<{ tag: string; count: number }[]>([]);
 export const settings = signal<SettingsDTO | null>(null);
 export const firstPageLoaded = signal(false);
+export type UploadStatus = 'queued' | 'hashing' | 'checking' | 'preparing' | 'uploading' | 'waiting' | 'failed' | 'done' | 'duplicate' | 'cancelled';
+export interface LocalFile extends FileDTO { localId: string; status: UploadStatus; progress: number; previewUrl: string; message: string }
+export const localItems = signal<LocalFile[]>([]);
+export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...localItems.value, ...items.value]);
+export const previewById = signal<Record<string, string>>({});
+export function clearPreviews(): void {
+  for (const url of Object.values(previewById.peek())) URL.revokeObjectURL(url);
+  previewById.value = {};
+}
+export function acceptUpload(file: FileDTO, preview = ''): void {
+  if (preview) {
+    const previous = previewById.peek()[file.id];
+    if (previous && previous !== preview) URL.revokeObjectURL(previous);
+    previewById.value = { ...previewById.peek(), [file.id]: preview };
+  }
+  items.value = [file, ...items.peek().filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
+  if (pending) {
+    pending.files = [file, ...pending.files.filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
+    pendingNew.value = pending.files.filter((item) => !items.peek().some((known) => known.id === item.id)).length;
+  }
+}
+export function updateThumbnail(id: string, thumbSize: number, width: number, height: number): void {
+  const update = (file: FileDTO) => file.id === id ? { ...file, thumbSize, width, height } : file;
+  items.value = items.peek().map(update);
+  if (pending) pending.files = pending.files.map(update);
+}
 let controller: AbortController | undefined;
 let token = 0;
 let authVersion = 0;
@@ -45,7 +71,9 @@ export async function loadFirstPage(): Promise<void> {
   try {
     const page = await api<Page>(query(48), { signal: controller.signal });
     if (request !== token) return;
-    batch(() => { items.value = page.files; nextCursor.value = page.nextCursor; status.value = 'idle'; firstPageLoaded.value = true; });
+    const fetched = new Set(page.files.map((file) => file.id));
+    const acceptedWhileLoading = items.peek().filter((file) => !fetched.has(file.id));
+    batch(() => { items.value = [...acceptedWhileLoading, ...page.files].sort((a, b) => b.id.localeCompare(a.id)); nextCursor.value = page.nextCursor; status.value = 'idle'; firstPageLoaded.value = true; });
   } catch {
     if (request === token) { errorMessage.value = message(); status.value = 'error'; }
   }
@@ -122,7 +150,7 @@ export async function refresh(): Promise<void> {
 }
 function clear(): void {
   controller?.abort(); token += 1; authVersion += 1; pending = null; lastRefresh = -Infinity;
-  batch(() => { items.value = []; nextCursor.value = null; status.value = 'idle'; errorMessage.value = ''; loadMoreError.value = ''; tags.value = []; settings.value = null; firstPageLoaded.value = false; resetUI(); });
+  batch(() => { items.value = []; localItems.value = []; clearPreviews(); nextCursor.value = null; status.value = 'idle'; errorMessage.value = ''; loadMoreError.value = ''; tags.value = []; settings.value = null; firstPageLoaded.value = false; resetUI(); });
 }
 effect(() => {
   const auth = authState.value;

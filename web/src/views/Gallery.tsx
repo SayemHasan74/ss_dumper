@@ -7,9 +7,14 @@ import { Icon } from '../components/Icon';
 import { Toast } from '../components/Toast';
 import { VirtualGrid } from '../components/VirtualGrid';
 import { closeViewer, route } from '../lib/router';
-import { errorMessage, firstPageLoaded, items, loadFirstPage, loadMore, loadMoreError, nextCursor, status } from '../store/files';
+import { errorMessage, firstPageLoaded, galleryItems as items, loadFirstPage, loadMore, loadMoreError, nextCursor, status } from '../store/files';
 import { clearFilters, hasFilters, online, pendingNew } from '../store/ui';
 import { showPending } from '../store/files';
+import { Fab } from '../components/Fab';
+import { UploadTray } from '../components/UploadTray';
+import { DropOverlay } from '../components/DropOverlay';
+import { enqueue } from '../upload/queue';
+import '../upload/backfill';
 
 let viewerModule: Promise<typeof import('../components/Viewer')> | undefined;
 const loadViewer = () => viewerModule ??= import('../components/Viewer').catch((error: unknown) => { viewerModule = undefined; throw error; });
@@ -27,6 +32,15 @@ export function Gallery() {
     const timeout = setTimeout(prefetch, 1500); return () => clearTimeout(timeout);
   }, [ready]);
   useEffect(() => () => clearCellCache(), []);
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
+      const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'));
+      if (files.length) { event.preventDefault(); enqueue(files, true); }
+    };
+    document.addEventListener('paste', paste); return () => document.removeEventListener('paste', paste);
+  }, []);
   const empty = !items.value.length && status.value !== 'loading' && status.value !== 'error';
   return <>
     <div inert={!!id} aria-hidden={id ? true : undefined}>
@@ -38,7 +52,9 @@ export function Gallery() {
       </main>
       {pendingNew.value > 0 && <button class="new-pill" onClick={showPending}>{pendingNew.value} new · Show</button>}
       <Toast />
+      <Fab /><UploadTray />
     </div>
+    <DropOverlay />
     {id && (Viewer ? <Viewer /> : <div class="viewer-loading" role="status"><span>{viewerError ? "Couldn't open viewer." : 'Opening viewer…'}</span>{viewerError && <button class="text-button" onClick={importViewer}>Retry</button>}<button class="icon-button" aria-label="Close viewer" onClick={closeViewer}><Icon name="close" /></button></div>)}
   </>;
 }

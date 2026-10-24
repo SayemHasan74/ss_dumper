@@ -37,3 +37,11 @@
 - Fetch viewer originals as blobs to inspect missing-object status before the one permitted propagation retry; revoke object URLs on file changes and close, and decode before fading/preloading.
 - Keep thumbnail first-load/retry caches only for the signed-in gallery lifetime, preventing repeated automatic retries after virtualization remounts without persisting filters or file data.
 - Verify browser behavior with installed Edge Chromium and its touch/network emulation without adding dependencies; real iPhone/Safari behavior remains a device check, not a claimed test result.
+- Enable pan/pinch on the viewer's outer overlay while actual-size mode is active, so its ancestor touch-action no longer blocks the zoom container; retain touch-action none in fit mode for custom swipes.
+- Keep the upload queue and File objects in module memory across authentication loss; revoke its preview URLs on auth-out, recreate pending previews after login, and never persist files or credentials to browser storage.
+- Share two preparation slots across hashing, upload thumbnails and backfill; limit original/thumbnail upload chains to three, or two for slow/data-saving connections.
+- Use the native hidden file input as the keyboard focus target and its associated label as the visible + control, preserving native picker gestures without programmatic click calls.
+- Treat an accepted original as added even if the thumbnail request hits a quota/auth/network failure; stop remaining work for fatal quota/storage errors and leave missing thumbnails to the bounded backfill job.
+- Preserve originals accepted while an initial list request was in flight, and merge own uploads into any pending refresh page so they cannot vanish or inflate the new-files pill.
+- Use XHR for upload/preflight/thumbnail requests and one retry policy, including Retry-After; keep backfill independently bounded to two attempts per image and stop it for the session on DAILY_LIMIT.
+- Keep successful preview URLs in the session map after the tray is cleared; revoke local previews on removal and every preview on sign-out, with decoded ImageBitmap/fallback URLs released in finally blocks.

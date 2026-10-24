@@ -114,7 +114,7 @@ export function Viewer() {
   const isImage = file?.mime.startsWith('image/');
   const decoded = ready && sourceId.current === id;
   function retryLoad(): void { setRetry((value) => value + 1); }
-  return <div ref={dialog} class="viewer" role="dialog" aria-modal="true" aria-label={file?.name ?? 'File viewer'} onClick={(event) => { if (event.target === event.currentTarget && !zoom) closeViewer(); }}>
+  return <div ref={dialog} class={zoom ? 'viewer allows-zoom' : 'viewer'} role="dialog" aria-modal="true" aria-label={file?.name ?? 'File viewer'} onClick={(event) => { if (event.target === event.currentTarget && !zoom) closeViewer(); }}>
     <div class="viewer-sheet" style={{ transform: `translateY(${dragY}px)` }}>
       <header class="viewer-top"><button ref={close} class="icon-button" aria-label="Close viewer" onClick={closeViewer}><Icon name="close" /></button><span class="viewer-name">{file?.name ?? 'Loading…'}</span>{index >= 0 && <span class="viewer-counter">{index + 1} / {list.length}</span>}</header>
       <div class={zoom ? 'viewer-stage zoomed' : 'viewer-stage'} onClick={(event) => { if (Date.now() >= suppressClick.current && (event.target === event.currentTarget || (event.target as HTMLElement).classList.contains('viewer-fit')) && !zoom) closeViewer(); }} onTouchStart={(event) => {

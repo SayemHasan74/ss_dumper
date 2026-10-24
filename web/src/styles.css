@@ -98,6 +98,7 @@ button:focus-visible, a:focus-visible, [tabindex="0"]:focus-visible { outline: 2
 .viewer-original { opacity: 0; transition: opacity 120ms ease; cursor: zoom-in; }
 .viewer-original.is-ready { opacity: 1; }
 .viewer-stage.zoomed { overflow: auto; touch-action: pan-x pan-y pinch-zoom; display: block; overscroll-behavior: contain; }
+.viewer.allows-zoom { touch-action: pan-x pan-y pinch-zoom; }
 .zoomed .viewer-fit { display: block; width: max-content; min-width: 100%; height: max-content; min-height: 100%; padding: 0; }
 .zoomed .viewer-original { max-width: none; max-height: none; margin: auto; cursor: zoom-out; }
 .viewer-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; pointer-events: none; }
@@ -122,3 +123,28 @@ button:focus-visible, a:focus-visible, [tabindex="0"]:focus-visible { outline: 2
 @media (max-width: 639px) { .file-cell, .skeleton { border-radius: 4px; } .viewer-fit { padding: 8px; } .chip { padding-inline: 11px; } }
 @media (hover: none), (pointer: coarse) { .viewer-chevron { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+.upload-picker { position: fixed; z-index: 30; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); }
+.upload-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.upload-fab { display: flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--bg); box-shadow: 0 4px 16px #0003; cursor: pointer; touch-action: manipulation; }
+.upload-fab:active { opacity: .8; }
+.upload-input:focus-visible + .upload-fab { outline: 2px solid var(--accent); outline-offset: 4px; }
+.upload-tray { position: fixed; z-index: 31; right: calc(16px + env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom)); width: min(390px, calc(100% - 32px - env(safe-area-inset-left) - env(safe-area-inset-right))); max-height: calc(100dvh - 104px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 6px 28px #0002; overflow: hidden; }
+.tray-summary { display: flex; min-height: 48px; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; text-align: left; font-size: 14px; font-weight: 600; }
+.tray-progress { display: block; width: 100%; height: 3px; accent-color: var(--accent); }
+.tray-message { font-size: 13px; padding: 12px 16px 0; color: var(--danger); }
+.tray-summary, .tray-progress, .tray-message, .tray-actions { flex-shrink: 0; }
+.tray-list { min-height: 0; max-height: 40dvh; overflow: auto; overscroll-behavior: contain; list-style: none; padding: 0 12px; }
+.tray-list li { display: flex; align-items: center; gap: 10px; padding-block: 8px; border-bottom: 1px solid var(--border); }
+.tray-preview { display: flex; width: 36px; height: 36px; flex-shrink: 0; object-fit: cover; align-items: center; justify-content: center; border-radius: 4px; background: var(--bg); color: var(--muted); }
+.tray-item-info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.tray-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.tray-item-info progress { width: 100%; height: 3px; accent-color: var(--accent); }
+.tray-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; padding: 0 4px; font-size: 13px; }
+.upload-error { color: var(--danger); }
+.cell-upload { position: absolute; inset: auto 0 0; padding: 7px; background: #111418d9; color: #fff; font-size: 11px; text-align: left; }
+.cell-upload.upload-error { color: #ffb4a9; }
+.cell-upload span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-upload progress { display: block; width: 100%; height: 3px; margin-top: 4px; accent-color: var(--accent); }
+.drop-overlay { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: color-mix(in srgb, var(--bg) 94%, transparent); color: var(--accent); border: 3px dashed var(--accent); font-weight: 600; pointer-events: none; }
+body:has(.upload-tray) .gallery { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
+body:has(.upload-tray) .toast-host { top: calc(var(--header-height) + 72px); bottom: auto; }
