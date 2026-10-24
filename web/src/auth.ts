@@ -7,6 +7,7 @@ export const bootError = signal(false);
 export async function bootAuth(): Promise<void> {
   bootError.value = false;
   authState.value = 'unknown';
+  if (!navigator.onLine) { bootError.value = true; return; }
   try {
     const session = await api<{ scope: 'full' | 'upload' }>('/api/auth/session');
     authState.value = session.scope === 'full' ? 'in' : 'out';
@@ -23,3 +24,4 @@ export async function logout(): Promise<void> {
   await api('/api/auth/logout', { method: 'POST' });
   authState.value = 'out';
 }
+window.addEventListener('online', () => { if (authState.peek() === 'unknown' && bootError.peek()) void bootAuth(); });

@@ -1,6 +1,6 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–6 provide secure sign-in, the file API, virtualized gallery, uploads, image/PDF viewer, selection, copying, downloads, Trash and settings. PWA installation and the iPhone Shortcut arrive in Part 7.
+Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–7 provide secure sign-in, the file API, virtualized gallery, uploads, viewer, copy workflows, Trash/settings, PWA installation and an iPhone Shortcut guide. Cleanup and deployment verification arrive in Part 8.
 
 Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
 
@@ -95,6 +95,31 @@ Remove-Item Env:SMOKE_ACCESS_KEY, Env:SMOKE_UPLOAD_TOKEN
 ```
 
 `-MaskInput` requires PowerShell 7. The smoke script runs against local D1/KV, prints ten PASS/FAIL steps, creates only its own synthetic files, and removes its test files and restores settings afterward. Use an isolated local instance for this test: its Empty Trash check purges existing Trash too. It exercises original streaming, deduplication, rejected uploads, JPEG thumbnails, pagination/filtering, ETags, ignored ranges, metadata edits, duplicate restore conflicts, bulk actions, settings and authentication boundaries. `scripts/lib/png.mjs` generates valid PNG test data with Node zlib and CRC32, without dependencies.
+
+## Install on iPhone or desktop
+
+1. After deployment, open your HTTPS Dump address in Safari on the iPhone.
+2. Tap Share, then Add to Home Screen. The gallery's dismissible install hint explains the same steps.
+3. Open the new Dump icon and sign in once inside it. The installed Home Screen app has its own login, separate from Safari.
+4. On Chromium browsers, Settings → Install shows Install app when the browser offers an install prompt. Otherwise use the browser's install menu if available.
+
+The app follows system light/dark styling, uses safe-area padding and keeps the specified default iOS status-bar style. Fixed upload/activity controls move above a reduced visual viewport when search is focused. Physical iPhone checks for keyboard behavior, status bar, notch/home indicator, clipboard and separate login persistence remain necessary; Chromium emulation is not an iPhone test.
+
+## Offline shell and updates
+
+Production builds register `/sw.js` after window load. The hand-written service worker runtime-caches only the public shell, hashed assets, icons and manifest, with a 60-entry FIFO cap. It bypasses every `/api/` request, non-GET, cross-origin and Range request. Navigations try the network for 2.5 seconds before using the cached shell. Browser caching of originals retains the private policy described above; the service worker does not cache originals, metadata or sessions.
+
+The first visit installs the worker without a precache list. Open/reload online under its control to warm the shell before testing an offline launch. Offline launch displays anonymous placeholders and You're offline; it does not open the authenticated gallery or restore a file list. Reconnecting checks the session with the server again.
+
+A changed service worker waits until you press Reload on the Update ready toast. Foreground update checks run at most once per ten minutes. Changes only to hashed app assets take effect on the next online load; a new-worker toast requires changed service-worker bytes. Finish uploads before accepting a reload; an in-memory queue cannot survive it. Service-worker caching is disabled in Vite development mode. Static assets remain on Workers Static Assets; no paid service was added.
+
+Icons are committed outputs, generated independently of the build with `node scripts/make-icons.mjs`. The generator uses Node's built-in PNG/zlib primitives and 4×4 supersampling, without an image library. See [Part 7 verification](docs/verification/part-7.md) for measured results and device limitations.
+
+## iPhone Shortcuts
+
+Follow [the numbered Shortcut guide](docs/ios-shortcut.md) to build Dump in the Share Sheet and Dump latest screenshots for the Action Button, Back Tap or Home Screen. Settings → iPhone Shortcut supplies your current Upload URL and a collapsible checklist. Use the separate upload token from your password manager, never your sign-in key or a token hash. The token is not displayed or stored by the app; keep the configured Shortcut private and never share it through an iCloud link.
+
+The Shortcut converts HEIC/HEIF to JPEG, URL-encodes names and sends a raw File POST. Optional SHA256 enables duplicate detection; missing thumbnails are backfilled when the web app is open. The guide includes a token test, rotation commands and the HTTP troubleshooting table. Actual Shortcut execution and File-body Content-Length must be verified on an iPhone after deployment.
 
 ## Checks
 

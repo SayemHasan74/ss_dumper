@@ -23,6 +23,7 @@ import { copyQueue, closeCopy, startCopy } from '../lib/clipboard';
 import { ConfirmHost, dialogCount } from '../components/Dialog';
 import { TagDialog } from '../components/TagDialog';
 import { EditDialog } from '../components/EditDialog';
+import { dismissInstallHint, showInstallHint } from '../pwa/install';
 
 let viewerModule: Promise<typeof import('../components/Viewer')> | undefined;
 const loadViewer = () => viewerModule ??= import('../components/Viewer').catch((error: unknown) => { viewerModule = undefined; throw error; });
@@ -81,6 +82,7 @@ export function Gallery() {
       {selectMode.value ? <SelectionBar /> : trashMode.value ? (Auxiliary ? <Auxiliary /> : <header class="app-header"><p>{auxError ? <button class="text-button" onClick={() => setAuxRetry((value) => value + 1)}>Retry Trash</button> : 'Loading Trash…'}</p></header>) : <Header />}
       {!trashMode.value && <FilterBar />}
       <main class="gallery page-width" id="gallery">
+        {!trashMode.value && showInstallHint.value && <aside class="install-hint"><p>Install Dump: tap Share, then Add to Home Screen.</p><button class="icon-button" aria-label="Dismiss install hint" onClick={dismissInstallHint}><Icon name="close" /></button></aside>}
         <div class="gallery-summary"><span>{status.value === 'loading' && !items.value.length ? 'Loading files…' : `${items.value.length}${nextCursor.value ? '+' : ''} ${items.value.length === 1 ? 'file' : 'files'}`}</span>{!online.value && <span>Offline</span>}</div>
         {status.value === 'error' && !items.value.length ? <section class="empty-state" role="status"><Icon name="refresh" size={32} /><h2>{errorMessage.value}</h2><button class="primary-button" onClick={() => void loadFirstPage()}>Retry</button></section> : empty ? <section class="empty-state"><Icon name={hasFilters.value ? 'search' : 'image'} size={36} /><h2>{trashMode.value ? 'Trash is empty' : hasFilters.value ? 'No matches' : 'Nothing here yet'}</h2>{!trashMode.value && (hasFilters.value ? <button class="text-button" onClick={() => { clearFilters(); void loadFirstPage(); }}>Clear filters</button> : <p>Tap + to add screenshots.</p>)}</section> : <VirtualGrid />}
         {loadMoreError.value && <div class="load-more-error" role="status"><span>Couldn't load more</span><button class="text-button" onClick={() => void loadMore(true)}>Retry</button></div>}

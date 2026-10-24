@@ -30,3 +30,47 @@ export function makePng(width, height, seed) {
   }
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0))]);
 }
+
+export function createRaster(width, height) {
+  return { width, height, data: new Uint8Array(width * height * 4) };
+}
+function paint(raster, x, y, color) { raster.data.set(color, (y * raster.width + x) * 4); }
+export function fillRect(raster, x, y, width, height, color) {
+  for (let py = Math.max(0, Math.floor(y)); py < Math.min(raster.height, Math.ceil(y + height)); py++)
+    for (let px = Math.max(0, Math.floor(x)); px < Math.min(raster.width, Math.ceil(x + width)); px++) paint(raster, px, py, color);
+}
+export function fillRoundRect(raster, x, y, width, height, radius, color) {
+  for (let py = Math.max(0, Math.floor(y)); py < Math.min(raster.height, Math.ceil(y + height)); py++) {
+    for (let px = Math.max(0, Math.floor(x)); px < Math.min(raster.width, Math.ceil(x + width)); px++) {
+      const cx = Math.max(x + radius, Math.min(x + width - radius, px + .5));
+      const cy = Math.max(y + radius, Math.min(y + height - radius, py + .5));
+      if ((px + .5 - cx) ** 2 + (py + .5 - cy) ** 2 <= radius ** 2) paint(raster, px, py, color);
+    }
+  }
+}
+export function thickLine(raster, x1, y1, x2, y2, width, color) {
+  const radius = width / 2, dx = x2 - x1, dy = y2 - y1, lengthSquared = dx * dx + dy * dy;
+  for (let y = Math.max(0, Math.floor(Math.min(y1, y2) - radius)); y < Math.min(raster.height, Math.ceil(Math.max(y1, y2) + radius)); y++) {
+    for (let x = Math.max(0, Math.floor(Math.min(x1, x2) - radius)); x < Math.min(raster.width, Math.ceil(Math.max(x1, x2) + radius)); x++) {
+      const t = lengthSquared ? Math.max(0, Math.min(1, ((x + .5 - x1) * dx + (y + .5 - y1) * dy) / lengthSquared)) : 0;
+      if ((x + .5 - x1 - t * dx) ** 2 + (y + .5 - y1 - t * dy) ** 2 <= radius ** 2) paint(raster, x, y, color);
+    }
+  }
+}
+export function rasterPng(raster, samples = 4) {
+  const width = raster.width / samples, height = raster.height / samples;
+  if (!Number.isInteger(width) || !Number.isInteger(height)) throw new RangeError('Raster dimensions must match supersampling.');
+  const pixels = Buffer.alloc(height * (width * 4 + 1));
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    let red = 0, green = 0, blue = 0, alpha = 0;
+    for (let sy = 0; sy < samples; sy++) for (let sx = 0; sx < samples; sx++) {
+      const offset = ((y * samples + sy) * raster.width + x * samples + sx) * 4, a = raster.data[offset + 3];
+      red += raster.data[offset] * a; green += raster.data[offset + 1] * a; blue += raster.data[offset + 2] * a; alpha += a;
+    }
+    const offset = y * (width * 4 + 1) + 1 + x * 4;
+    pixels[offset] = alpha ? Math.round(red / alpha) : 0; pixels[offset + 1] = alpha ? Math.round(green / alpha) : 0;
+    pixels[offset + 2] = alpha ? Math.round(blue / alpha) : 0; pixels[offset + 3] = Math.round(alpha / samples ** 2);
+  }
+  const header = Buffer.alloc(13); header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6;
+  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0))]);
+}

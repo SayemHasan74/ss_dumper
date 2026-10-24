@@ -57,3 +57,13 @@
 - Read build version from package.json via the installed Vite-compatible default JSON import with attributes; expose the UTC build date through Vite define constants.
 - Put Copy Queue, upload tray and toast in one bounded, scrollable activity stack above phone actions, so simultaneous widgets cannot overlap; retain the Copy Queue at the reachable end on short viewports.
 - Release the bulk-action lock after the mutation rather than waiting for a follow-up list read; Undo can immediately reinsert files and start restore while that refresh is pending.
+- Save the Part 7 pasted message verbatim and cross-check the complete Markdown Part 7; both specify the same functional requirements, with headings/formatting differing.
+- Satisfy Part 7 offline visuals with anonymous skeletons inside the boot-error screen, not an authenticated gallery; never persist authentication or file metadata, and recheck the session on reconnect.
+- Keep service-worker caching runtime-only with the exact dump-static-v1 name and a serialized 60-entry FIFO trim; cache writes failing locally must not break a successful network response.
+- Keep first-install behavior free of precaching/automatic skipWaiting; an online controlled load warms the shell. Hashed-app changes appear on navigation; the update toast is for changed service-worker bytes.
+- Fall back to an existing service-worker registration if network registration fails on offline launch, preserving later foreground update checks without caching an API response.
+- Make apple-touch-icon-180 full-bleed and fully opaque, following the explicit Apple-icon rule despite the preceding ambiguous mention of rounded 180 icons; only ordinary any/favicons have transparent rounded corners.
+- Render exact icon geometry with built-in PNG/zlib and 4x4 supersampling; average premultiplied color channels to avoid dark transparent-edge fringes, and reduce the maskable glyph to 80 percent.
+- Keep the deferred Chromium install prompt only in memory; persist only the specified dismissal boolean and retain the existing copy-mode preference, never an upload token.
+- Account for the visual viewport's keyboard inset while search is focused so fixed upload/activity controls stay reachable; retain the sticky header and existing safe-area/dynamic-viewport layout.
+- Retain the requested default iOS status-bar style until a physical-device observation warrants a change; Windows/Chromium tests cannot establish iPhone Home Screen clipboard, status bar, permissions or Shortcut behavior.
