@@ -1,0 +1,12 @@
+export const SESSION_SLIDING_MS = 30 * 86400000;
+export const SESSION_ABSOLUTE_MS = 180 * 86400000;
+export const SESSION_RENEW_THRESHOLD_MS = 15 * 86400000;
+export const CLOCK_SKEW_MS = 5 * 60000;
+export const LOGIN_MAX_FAILS = 5;
+export const LOGIN_WINDOW_MS = 15 * 60000;
+export const BEARER_MAX_FAILS = 10;
+export const BEARER_WINDOW_MS = 15 * 60000;
+export const EPOCH_CACHE_MS = 30000;
+export const AUTH_BODY_MAX_BYTES = 1024;
+export const KEY_REGEX = /^[A-Za-z0-9_-]{43}$/;
+export const CSRF_HEADER = 'x-dump-client';

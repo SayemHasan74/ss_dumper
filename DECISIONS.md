@@ -10,3 +10,13 @@
 - Replace the R2-era Part 1 spec with the user's revised attachment verbatim; it is the current implementation source.
 - Use the already-created dump-files KV namespace with binding FILES and the already-created dump-db D1 database; configure their verified IDs instead of creating duplicate resources.
 - Keep storage behavior in Part 3; Part 1 only replaces the binding and documents the revised 900 MB cap and KV constraints.
+- Do not add a global login lockout because an attacker could lock out the owner; counters use salted, hashed full IP addresses.
+- Treat the bearer limiter as noise reduction only; a valid high-entropy upload token always passes without database access, even after invalid attempts.
+- Use plain SHA-256 for the randomly generated 256-bit access/upload credentials; slow password hashing adds no useful protection and would consume the free Worker CPU budget.
+- Use one D1 batch with INSERT, cleanup DELETE, and SELECT for recordFailure; the spec's requested SELECT is the third statement in the same atomic round trip.
+- Apply the gate to OPTIONS and unknown methods like every other non-public API request; authenticated requests passing CSRF fall through to 404, while anonymous requests remain 401.
+- Use Vitest's imported types and the existing dependency tree without installing @types/node; normalize TextEncoder output to an ArrayBuffer-backed Uint8Array and supply ignoreBOM to match installed Workers types.
+- Use a discriminated type-prop spread for the password visibility toggle to satisfy Preact 11's installed input attribute types without casts to any.
+- Preserve unselected local secrets when combining --only with --write-dev-vars, so rotation cannot silently invalidate unrelated credentials.
+- Keep the login card minimal with system fonts, inline SVG, safe-area padding and light/dark contrast; discard the UI skill's unrelated marketing layout and external-font suggestions to follow the spec.
+- Preview the production CSP on Wrangler's static asset server rather than Vite's development injection; no production CSP relaxation is allowed.

@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [preact(), tailwindcss()],
   server: {
     port: 5173,
-    proxy: { '/api': 'http://localhost:8787' },
+    proxy: { '/api': { target: 'http://localhost:8787', changeOrigin: false } },
   },
   build: {
     outDir: '../dist',
@@ -15,5 +15,6 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     cssCodeSplit: false,
+    modulePreload: { polyfill: false },
   },
 });
