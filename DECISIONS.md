@@ -31,3 +31,9 @@
 - Use DELETE RETURNING in the atomic purge batch so only rows actually deleted produce KV deletes, avoiding removal of a concurrently restored file's objects.
 - Use 8 KB JSON for upload hash checks, 4 KB for file metadata, 16 KB for bulk actions, and 1 KB for settings, preserving the specified route limits.
 - Treat If-None-Match weak tags as matches for GET/HEAD as well as exact strong tags; conditional and HEAD responses never read KV.
+- Preserve the required blank screen until the session check completes; following the user's instruction to choose the safest option, measure the cached-shell skeleton target from DOMContentLoaded and report full navigation separately (581.1 ms versus 1177.6 ms under Fast 3G). The latter does not meet a strict navigation-to-skeleton one-second target.
+- Cap gallery content at 1440 px for readability while applying the specified column/cell formula to the measured padded content width.
+- Replace the viewer history entry during next/previous navigation so Back closes the viewer in one step; keep the gallery mounted, lock body scroll, and remeasure after restoring it.
+- Fetch viewer originals as blobs to inspect missing-object status before the one permitted propagation retry; revoke object URLs on file changes and close, and decode before fading/preloading.
+- Keep thumbnail first-load/retry caches only for the signed-in gallery lifetime, preventing repeated automatic retries after virtualization remounts without persisting filters or file data.
+- Verify browser behavior with installed Edge Chromium and its touch/network emulation without adding dependencies; real iPhone/Safari behavior remains a device check, not a claimed test result.

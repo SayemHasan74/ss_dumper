@@ -1,6 +1,6 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–3 provide the foundation, secure sign-in, and authenticated file API. The browser currently shows the signed-in placeholder; gallery and upload UI arrive in later parts.
+Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–4 provide the foundation, secure sign-in, authenticated file API, virtualized gallery, filters/search and full-screen image/PDF viewer. Upload UI arrives in Part 5; selection, copying and file actions arrive in Part 6.
 
 Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
 
@@ -28,6 +28,23 @@ npm run dev
 ```
 
 Open http://localhost:5173 and sign in with the locally generated ACCESS_KEY. Vite proxies `/api` to Wrangler on port 8787, preserving the original host. `/api/health` returns `{"ok":true}`. `/api/nope` returns 401 without credentials and the NOT_FOUND envelope with status 404 after authentication. The initial build supplies Wrangler's static asset directory. Wrangler uses local D1 and KV during development; `npx wrangler dev --local --port 8787` explicitly selects local mode if needed.
+
+## Gallery and viewer
+
+The signed-in gallery follows the system light/dark theme and uses window scrolling with a virtualized square grid. Search, file type, local-day/time, pin and tag filters are temporary. Refresh merges the newest page; when scrolled down, a new-files pill waits for your tap before inserting files. The gallery stays mounted behind the lazy-loaded viewer, preserving loaded pages and scroll position.
+
+Open a cell to view its original; use arrow keys, chevrons or touch swipes to navigate. Click an image or double-tap on touch to change zoom. Escape exits zoom first, then closes; Back also closes the viewer. PDFs have authenticated Open and Download links. New images retry a missing thumbnail/original once after three seconds to allow for KV propagation. Older failures require explicit retry for originals.
+
+For local performance testing, use an isolated local database/KV instance: synthetic files remain until you delete them. With the local server running, PowerShell 7 can prompt for the local upload token without saving it in shell history:
+
+```powershell
+$env:SMOKE_BASE_URL = 'http://localhost:8787'
+$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Local upload token' -MaskInput
+node scripts/seed.mjs 300
+Remove-Item Env:SMOKE_UPLOAD_TOKEN
+```
+
+The default count is 300; use 5000 for the larger scrolling check. The script creates unique 64×64 PNGs, four uploads at a time, and prints counts only. HTTPS targets are refused unless `--force` is explicitly supplied, since each upload consumes live KV write quota. The script never runs in CI. Part 4 measurements and test limits are recorded in [the verification report](docs/verification/part-4.md).
 
 ## File API and free-plan storage
 
