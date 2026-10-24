@@ -4,6 +4,7 @@ import { gridMetrics } from '../store/ui';
 import { openViewer, route } from '../lib/router';
 import { Cell } from './Cell';
 import { Skeleton } from './Skeleton';
+import { selectMode, toggleSelection } from '../store/selection';
 
 interface Layout { cols: number; cell: number; gap: number; first: number; last: number; rowHeight: number }
 export function VirtualGrid() {
@@ -68,7 +69,7 @@ export function VirtualGrid() {
     if (!files.length) return;
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-file-id]');
     const index = target ? files.findIndex((file) => file.id === target.dataset.fileId) : Math.min(focused, files.length - 1);
-    if (event.key === 'Enter') { event.preventDefault(); if (!('localId' in files[index])) openViewer(files[index].id, target ?? event.currentTarget); return; }
+    if (event.key === 'Enter') { event.preventDefault(); const file = files[index]; if (!('localId' in file)) { if (selectMode.peek()) toggleSelection(file); else openViewer(file.id, target ?? event.currentTarget); } return; }
     const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -layout.cols, ArrowDown: layout.cols };
     if (moves[event.key] === undefined) return;
     event.preventDefault(); keyboard.current = true;

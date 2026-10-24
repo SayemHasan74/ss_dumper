@@ -6,6 +6,9 @@ import { filters, gridMetrics, online, pendingNew, resetUI, showToast } from './
 
 interface Page { files: FileDTO[]; nextCursor: string | null }
 export const items = signal<FileDTO[]>([]);
+export const trashMode = signal(false);
+export const fileUpdates = signal<Record<string, FileDTO>>({});
+export let dataVersion = 0;
 export const nextCursor = signal<string | null>(null);
 export const status = signal<'idle' | 'loading' | 'loadingMore' | 'error'>('idle');
 export const errorMessage = signal('');
@@ -16,7 +19,7 @@ export const firstPageLoaded = signal(false);
 export type UploadStatus = 'queued' | 'hashing' | 'checking' | 'preparing' | 'uploading' | 'waiting' | 'failed' | 'done' | 'duplicate' | 'cancelled';
 export interface LocalFile extends FileDTO { localId: string; status: UploadStatus; progress: number; previewUrl: string; message: string }
 export const localItems = signal<LocalFile[]>([]);
-export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...localItems.value, ...items.value]);
+export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...(trashMode.value ? [] : localItems.value), ...items.value]);
 export const previewById = signal<Record<string, string>>({});
 export function clearPreviews(): void {
   for (const url of Object.values(previewById.peek())) URL.revokeObjectURL(url);
@@ -28,6 +31,7 @@ export function acceptUpload(file: FileDTO, preview = ''): void {
     if (previous && previous !== preview) URL.revokeObjectURL(previous);
     previewById.value = { ...previewById.peek(), [file.id]: preview };
   }
+  if (trashMode.peek()) return;
   items.value = [file, ...items.peek().filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
   if (pending) {
     pending.files = [file, ...pending.files.filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
@@ -45,9 +49,10 @@ let authVersion = 0;
 let lastRefresh = -Infinity;
 let pending: Page | null = null;
 
-function query(limit: number, cursor?: string): string {
+export function listQuery(limit: number, cursor?: string): string {
   const f = filters.peek();
   const search = new URLSearchParams({ limit: String(limit) });
+  if (trashMode.peek()) { search.set('trash', '1'); if (cursor) search.set('cursor', cursor); return `/api/files?${search}`; }
   if (cursor) search.set('cursor', cursor);
   if (f.type !== 'all') search.set('type', f.type);
   if (f.pinned) search.set('pinned', '1');
@@ -69,7 +74,7 @@ export async function loadFirstPage(): Promise<void> {
   pending = null;
   batch(() => { items.value = []; nextCursor.value = null; pendingNew.value = 0; status.value = 'loading'; errorMessage.value = ''; loadMoreError.value = ''; firstPageLoaded.value = false; });
   try {
-    const page = await api<Page>(query(48), { signal: controller.signal });
+    const page = await api<Page>(listQuery(48), { signal: controller.signal });
     if (request !== token) return;
     const fetched = new Set(page.files.map((file) => file.id));
     const acceptedWhileLoading = items.peek().filter((file) => !fetched.has(file.id));
@@ -86,7 +91,7 @@ export async function loadMore(retry = false): Promise<void> {
   status.value = 'loadingMore';
   loadMoreError.value = '';
   try {
-    const page = await api<Page>(query(60, nextCursor.peek()!), { signal: controller.signal });
+    const page = await api<Page>(listQuery(60, nextCursor.peek()!), { signal: controller.signal });
     if (request !== token) return;
     const known = new Set(items.peek().map((file) => file.id));
     batch(() => { items.value = [...items.peek(), ...page.files.filter((file) => !known.has(file.id))]; nextCursor.value = page.nextCursor; status.value = 'idle'; });
@@ -131,7 +136,7 @@ export async function refresh(): Promise<void> {
   status.value = 'loading';
   void loadTags();
   try {
-    const page = await api<Page>(query(48), { signal: controller.signal });
+    const page = await api<Page>(listQuery(48), { signal: controller.signal });
     if (request !== token) return;
     const known = new Set(items.peek().map((file) => file.id));
     const added = page.files.filter((file) => !known.has(file.id)).length;
@@ -149,6 +154,7 @@ export async function refresh(): Promise<void> {
   }
 }
 function clear(): void {
+  dataVersion++; fileUpdates.value = {};
   controller?.abort(); token += 1; authVersion += 1; pending = null; lastRefresh = -Infinity;
   batch(() => { items.value = []; localItems.value = []; clearPreviews(); nextCursor.value = null; status.value = 'idle'; errorMessage.value = ''; loadMoreError.value = ''; tags.value = []; settings.value = null; firstPageLoaded.value = false; resetUI(); });
 }

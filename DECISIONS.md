@@ -45,3 +45,15 @@
 - Preserve originals accepted while an initial list request was in flight, and merge own uploads into any pending refresh page so they cannot vanish or inflate the new-files pill.
 - Use XHR for upload/preflight/thumbnail requests and one retry policy, including Retry-After; keep backfill independently bounded to two attempts per image and stop it for the session on DAILY_LIMIT.
 - Keep successful preview URLs in the session map after the tray is cleared; revoke local previews on removal and every preview on sign-out, with decoded ImageBitmap/fallback URLs released in finally blocks.
+- Part 6 copy queues and combined sheets always sort chronologically (createdAt ascending, then id), independent of selection order, so screenshots read naturally.
+- Pin fflate to 0.8.3 and import it only inside multi-download; use its ZipPassThrough store-only stream and sequential original reads, with a 300 MiB combined-size guard matching the app's binary byte units.
+- Preserve the Part 3 quota amendment in the UI: never roll back purge rows after DAILY_LIMIT; stop further requests, keep unsubmitted rows, and reload remaining Trash after Empty Trash quota exhaustion.
+- Reuse the gallery's virtual grid for Trash with a separate query mode; abort/reload on collection changes, keep upload previews outside the Trash list, and pause thumbnail backfill there.
+- Install dialog focus/keyboard handling in a layout effect so Escape and focus trapping are ready on first display; confirmations default focus to Cancel and restore the originating control when present.
+- Prefetch real Files before exposing Share so navigator.share runs within the click gesture; hide Share when the actual Files are unsupported or more than ten are selected.
+- Keep selected metadata snapshots for matching-but-unloaded files; bound selection at 2,000 IDs and issue sequential 200-ID mutations (100 for purge). Rollback restores only rows that were loaded before the action.
+- Track authentication data generations and deep-view metadata updates so late mutations cannot repopulate signed-out state and deep-linked viewer edits remain visible without inventing adjacent gallery items.
+- Use the measured padded content width to move selection actions to the phone toolbar, avoiding a container-query containing block that would anchor fixed controls to the header.
+- Read build version from package.json via the installed Vite-compatible default JSON import with attributes; expose the UTC build date through Vite define constants.
+- Put Copy Queue, upload tray and toast in one bounded, scrollable activity stack above phone actions, so simultaneous widgets cannot overlap; retain the Copy Queue at the reachable end on short viewports.
+- Release the bulk-action lock after the mutation rather than waiting for a follow-up list read; Undo can immediately reinsert files and start restore while that refresh is pending.

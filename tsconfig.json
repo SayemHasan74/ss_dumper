@@ -11,5 +11,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["web/src", "shared"]
+  "include": ["web/src", "web/test", "shared"]
 }

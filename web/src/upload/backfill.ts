@@ -1,6 +1,6 @@
 import { effect, untracked } from '@preact/signals';
 import { authState } from '../auth';
-import { firstPageLoaded, items, updateThumbnail } from '../store/files';
+import { firstPageLoaded, items, updateThumbnail, trashMode } from '../store/files';
 import { online } from '../store/ui';
 import { busy, foreground, prepare } from './queue';
 import { createThumbnail } from './thumb';
@@ -10,7 +10,7 @@ const attempts = new Map<string, number>();
 let stopped = false, running = false, version = 0;
 let controller: AbortController | undefined;
 let cancelIdle: (() => void) | undefined;
-const allowed = () => authState.peek() === 'in' && firstPageLoaded.peek() && !busy.peek() && !document.hidden && navigator.onLine && !stopped;
+const allowed = () => authState.peek() === 'in' && !trashMode.peek() && firstPageLoaded.peek() && !busy.peek() && !document.hidden && navigator.onLine && !stopped;
 function schedule(): void {
   cancelIdle?.(); cancelIdle = undefined;
   if (!allowed()) { controller?.abort(); return; }
@@ -48,6 +48,6 @@ function schedule(): void {
 }
 effect(() => {
   const auth = authState.value;
-  void items.value; void busy.value; void online.value; void foreground.value; void firstPageLoaded.value;
+  void items.value; void busy.value; void online.value; void foreground.value; void firstPageLoaded.value; void trashMode.value;
   untracked(() => { if (auth === 'out') { version++; attempts.clear(); stopped = false; } schedule(); });
 });

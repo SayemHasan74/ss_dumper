@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",
+    "fflate": "0.8.3",
     "hono": "^4.13.13",
     "preact": "^11.0.2"
   },

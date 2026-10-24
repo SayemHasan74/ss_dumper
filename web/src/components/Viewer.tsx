@@ -5,8 +5,14 @@ import { api } from '../lib/api';
 import { isTouch } from '../lib/env';
 import { bytes, dateTime } from '../lib/format';
 import { closeViewer, navigate, restoreViewerFocus, route } from '../lib/router';
-import { items, loadMore, nextCursor } from '../store/files';
+import { fileUpdates, items, loadMore, nextCursor, settings } from '../store/files';
 import { Icon } from './Icon';
+import { bulkAction } from '../store/actions';
+import { copyQueue, eligible, startCopy } from '../lib/clipboard';
+import { downloadFiles } from '../lib/zip';
+import { shareableFiles, shareFiles } from '../lib/share';
+import { confirmAction, dialogCount } from './Dialog';
+import { openEdit } from './EditDialog';
 
 export function Viewer() {
   const id = route.value.id!;
@@ -29,7 +35,17 @@ export function Viewer() {
   const lastTap = useRef(0);
   const suppressClick = useRef(0);
   const sourceId = useRef('');
-  const file = index >= 0 ? list[index] : deepFile?.id === id ? deepFile : null;
+  const file = index >= 0 ? list[index] : fileUpdates.value[id] ?? (deepFile?.id === id ? deepFile : null);
+  const currentFile = useRef<FileDTO | null>(file); currentFile.current = file;
+  const [shared, setShared] = useState<File[] | null>(null);
+  useEffect(() => { let active = true; setShared(null); if (file) void shareableFiles([file]).then((result) => { if (active) setShared(result); }); return () => { active = false; }; }, [file?.id, file?.name, file?.mime]);
+  async function removeCurrent(permanent = false): Promise<void> {
+    const current = currentFile.current;
+    if (!current) return;
+    if (permanent && !await confirmAction("Delete 1 files forever? This can't be undone.")) return;
+    const files = items.peek(), position = files.findIndex((file) => file.id === current.id), next = files[position + 1] ?? files[position - 1];
+    if (await bulkAction(permanent ? 'purge' : 'trash', [current])) { if (next) navigate(`/v/${next.id}`, { replace: true }); else closeViewer(); }
+  }
   const cursor = nextCursor.value;
   function move(direction: number): void {
     const files = items.peek();
@@ -41,6 +57,7 @@ export function Viewer() {
     const controller = new AbortController();
     setMetadataError(false); setDeepFile(null);
     if (!items.peek().some((item) => item.id === id)) {
+      const updates = { ...fileUpdates.peek() }; delete updates[id]; fileUpdates.value = updates;
       void api<{ file: FileDTO }>(`/api/files/${id}`, { signal: controller.signal }).then((response) => setDeepFile(response.file)).catch(() => { if (!controller.signal.aborted) setMetadataError(true); });
     }
     return () => controller.abort();
@@ -51,6 +68,12 @@ export function Viewer() {
     Object.assign(document.body.style, { position: 'fixed', top: `-${y}px`, width: '100%', overflow: 'hidden' });
     close.current?.focus();
     const keydown = (event: KeyboardEvent) => {
+      if (dialogCount.peek() || copyQueue.peek()) return;
+      if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) return;
+      const current = currentFile.current;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && current && eligible(current)) { event.preventDefault(); startCopy([current]); }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && current) { event.preventDefault(); void removeCurrent(current.deletedAt !== null); }
+      if (event.key === 'p' && current && !current.deletedAt) { event.preventDefault(); void bulkAction(current.pinned ? 'unpin' : 'pin', [current]); }
       if (event.key === 'Escape') { event.preventDefault(); if (zoomRef.current) setZoom(false); else closeViewer(); }
       if (!zoomRef.current && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); }
       if (event.key === 'Tab') {
@@ -117,6 +140,9 @@ export function Viewer() {
   return <div ref={dialog} class={zoom ? 'viewer allows-zoom' : 'viewer'} role="dialog" aria-modal="true" aria-label={file?.name ?? 'File viewer'} onClick={(event) => { if (event.target === event.currentTarget && !zoom) closeViewer(); }}>
     <div class="viewer-sheet" style={{ transform: `translateY(${dragY}px)` }}>
       <header class="viewer-top"><button ref={close} class="icon-button" aria-label="Close viewer" onClick={closeViewer}><Icon name="close" /></button><span class="viewer-name">{file?.name ?? 'Loading…'}</span>{index >= 0 && <span class="viewer-counter">{index + 1} / {list.length}</span>}</header>
+      {file && <div class="viewer-actions" role="toolbar" aria-label="File actions">{file.deletedAt ? <><button class="action-button" onClick={async () => { if (await bulkAction('restore', [file])) closeViewer(); }}>Restore</button><button class="action-button" onClick={() => void removeCurrent(true)}>Delete forever</button></> : <>
+        <button class="action-button" disabled={!eligible(file)} title={!eligible(file) ? "PDFs can't be copied. Use Download." : 'Copy image'} onClick={() => startCopy([file])}><Icon name="copy" />Copy</button><button class="action-button" onClick={() => void downloadFiles([file])}><Icon name="download" />Download</button>{shared && <button class="action-button" onClick={() => shareFiles(shared)}><Icon name="share" />Share</button>}<button class="action-button" onClick={() => void bulkAction(file.pinned ? 'unpin' : 'pin', [file])}><Icon name="pin" />{file.pinned ? 'Unpin' : 'Pin'}</button><button class="action-button" onClick={() => openEdit(file)}><Icon name="edit" />Edit</button><button class="action-button" onClick={() => void removeCurrent()}><Icon name="trash" />Delete</button>
+      </>}</div>}
       <div class={zoom ? 'viewer-stage zoomed' : 'viewer-stage'} onClick={(event) => { if (Date.now() >= suppressClick.current && (event.target === event.currentTarget || (event.target as HTMLElement).classList.contains('viewer-fit')) && !zoom) closeViewer(); }} onTouchStart={(event) => {
         touch.current = !zoom && event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
       }} onTouchMove={(event) => {
@@ -149,7 +175,7 @@ export function Viewer() {
         </> : <div class="pdf-card"><Icon name="file-pdf" size={44} /><h2>{file.name}</h2><p>{bytes(file.size)}</p><div><a class="viewer-button" href={`/api/files/${file.id}/original`} target="_blank" rel="noopener">Open</a><a class="viewer-button secondary" href={`/api/files/${file.id}/original?download=1`}>Download</a></div></div>}
         {index >= 0 && <><button class="viewer-chevron previous icon-button" aria-label="Previous file" disabled={index === 0} onClick={() => move(-1)}><Icon name="chevron-left" size={28} /></button><button class="viewer-chevron next icon-button" aria-label="Next file" disabled={index === list.length - 1} onClick={() => move(1)}><Icon name="chevron-right" size={28} /></button></>}
       </div>
-      {file && <footer class="viewer-info"><p>{bytes(file.size)}{file.width && file.height ? ` · ${file.width} × ${file.height}` : ''}<span class="info-divider">·</span><time dateTime={new Date(file.createdAt).toISOString()}>{dateTime(file.createdAt)}</time></p>{file.tags.length > 0 && <div class="viewer-tags">{file.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}{file.note && <p class="viewer-note">{file.note}</p>}</footer>}
+      {file && <footer class="viewer-info"><p>{bytes(file.size)}{file.width && file.height ? ` · ${file.width} × ${file.height}` : ''}<span class="info-divider">·</span><time dateTime={new Date(file.createdAt).toISOString()}>{dateTime(file.createdAt)}</time></p>{file.pinned && !!settings.value?.autoExpireDays ? <p>Pinned — never expires</p> : file.expiresAt && file.expiresAt - Date.now() <= 14 * 86400000 ? <p>Expires in {Math.max(0, Math.ceil((file.expiresAt - Date.now()) / 86400000))} days</p> : null}{file.tags.length > 0 && <div class="viewer-tags">{file.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}{file.note && <p class="viewer-note">{file.note}</p>}</footer>}
     </div>
   </div>;
 }

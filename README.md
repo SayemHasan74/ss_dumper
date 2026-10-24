@@ -1,6 +1,6 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–5 provide secure sign-in, the file API, virtualized gallery, filters/search, image/PDF viewer and uploads with local thumbnails. Selection, copying and file actions arrive in Part 6.
+Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–6 provide secure sign-in, the file API, virtualized gallery, uploads, image/PDF viewer, selection, copying, downloads, Trash and settings. PWA installation and the iPhone Shortcut arrive in Part 7.
 
 Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
 
@@ -57,6 +57,18 @@ The upload tray sits above +. Tap its summary to inspect file progress, retry fa
 Network/timeouts and retryable responses have at most three retries with backoff. Daily quota exhaustion stops the queue and offers manual Retry after the quota resets. A full storage response also stops the queue. If an original succeeds but its thumbnail fails, the original remains added. When uploads are idle and the app is visible/online, a background job fills missing image thumbnails one at a time (originals up to 15 MiB, at most two attempts per image per signed-in session). A daily-limit response stops backfill for that session.
 
 Preview URLs remain in memory for the signed-in session to hide storage propagation delays. Cancellation/clearing a local item revokes its preview; sign-out revokes all local and completed previews. Nothing in the queue is saved to browser storage. Images generally cost two KV writes, originals plus thumbnails. See [Part 5 verification](docs/verification/part-5.md) for measured behavior and limitations.
+
+## Select, copy and manage files
+
+Tap Select in the header or long-press a cell for half a second. On desktop, use the hover check, Ctrl/Cmd-click to toggle or Shift-click for a range. Escape/Clear, filter/search changes and successful destructive actions clear selection. The Select menu can choose loaded files by date/type, or page through everything matching the current filters up to 2,000 files. On a phone, Copy and Delete live in the bottom toolbar; + is hidden while selecting.
+
+Copy one image, then paste into your chat. JPEG/GIF/WebP sources are converted to PNG. PDFs use Download/Open/Share. For several images, the Copy Queue copies the first immediately and offers Copy next after each paste. One by one copies separate images; One image combines them into white PNG sheets, at most six screenshots per sheet with additional size/area limits. Both modes order screenshots oldest first, regardless of selection order. The mode is remembered in `dump.copyMode`; at most two prepared entries are cached in memory. If copying is unavailable or denied, the app offers Download instead.
+
+Download one file directly, or several as a browser-built store-only ZIP with unique names (300 MiB combined limit). Share appears only when the browser supports the actual selected Files, up to ten at once. Delete moves files to Trash immediately with a six-second Undo toast. Pin protects files from auto-delete; Tag adds/removes a normalized tag; Edit changes one file's name, note and tags. Failed mutations roll back while keeping the selection. Permanent deletion is available only for trashed files and requires confirmation.
+
+Open Trash or Settings from the header menu. Trash supports restore, permanent delete and Empty Trash, and reports skipped duplicate restores. If permanent deletion hits the daily storage limit, the app stops; already-deleted database rows remain deleted and Part 8 orphan cleanup will handle their leftover storage. Unsubmitted files remain available. Settings shows active/Trash storage usage, auto-delete and Trash retention, build information, Sign out and Sign out everywhere. The latter invalidates other sessions immediately in the same isolate and within 30 seconds in other isolates.
+
+Keyboard: Ctrl/Cmd+A selects loaded files, Ctrl/Cmd+C copies selected images (or the current viewer image), Delete trashes selection, / opens search, and Escape closes the innermost dialog/queue/viewer or clears selection. Viewer shortcuts also include Backspace to delete and P to pin. Dialogs trap and restore focus. See [Part 6 verification](docs/verification/part-6.md) for browser coverage and remaining Safari/device verification.
 
 ## File API and free-plan storage
 
@@ -120,7 +132,7 @@ Use `--only=access` if the sign-in key is forgotten, `--only=upload` if a Shortc
 
 For local rotation, append `--write-dev-vars`; it replaces only the selected value and preserves the other two secrets. Without `--only`, all three are generated. Plaintext access/upload keys are never written to `.dev.vars`. Never commit `.dev.vars`, `.env` files, keys, or tokens; only empty example templates belong in Git.
 
-Until the Part 6 UI exists, sign out everywhere by issuing this same-origin request while signed in (for example in the browser's developer console):
+Sign out everywhere from Settings, or issue this same-origin request while signed in (for example in the browser's developer console):
 
 ```js
 fetch('/api/auth/logout-all', { method: 'POST', headers: { 'x-dump-client': '1' }, credentials: 'same-origin' })

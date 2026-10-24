@@ -11,10 +11,10 @@ export interface ToastMessage { id: number; message: string; action?: { label: s
 export const toast = signal<ToastMessage | null>(null);
 let toastId = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-export function showToast(message: string, action?: ToastMessage['action'], error = false): void {
+export function showToast(message: string, action?: ToastMessage['action'], error = false, duration = 5000): void {
   clearTimeout(toastTimer);
   toast.value = { id: ++toastId, message, action, error };
-  toastTimer = setTimeout(() => { toast.value = null; }, 5000);
+  toastTimer = duration > 0 ? setTimeout(() => { toast.value = null; }, duration) : undefined;
 }
 export function resetUI(): void {
   filters.value = { ...defaults };

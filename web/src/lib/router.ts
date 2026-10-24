@@ -3,11 +3,14 @@ import { signal } from '@preact/signals';
 export interface Route { view: string; id?: string }
 const table: { pattern: RegExp; resolve: (match: RegExpMatchArray) => Route }[] = [
   { pattern: /^\/$/, resolve: () => ({ view: 'gallery' }) },
+  { pattern: /^\/trash$/, resolve: () => ({ view: 'trash' }) },
+  { pattern: /^\/settings$/, resolve: () => ({ view: 'settings' }) },
   { pattern: /^\/v\/([0-9A-HJKMNP-TV-Z]{26})$/, resolve: (match) => ({ view: 'viewer', id: match[1] }) },
 ];
 export const route = signal<Route>({ view: 'gallery' });
 let fromGallery = false;
 let origin: HTMLElement | null = null;
+let viewerReturn = '/';
 function sync(): void {
   if (!location.hash) history.replaceState(null, '', '#/');
   const path = location.hash.slice(1) || '/';
@@ -26,13 +29,14 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
   else { location.hash = path; sync(); }
 }
 export function openViewer(id: string, element?: HTMLElement): void {
-  fromGallery = route.peek().view === 'gallery';
+  fromGallery = ['gallery', 'trash'].includes(route.peek().view);
+  viewerReturn = route.peek().view === 'trash' ? '/trash' : '/';
   if (element) origin = element;
   navigate(`/v/${id}`);
 }
 export function closeViewer(): void {
   if (fromGallery) { fromGallery = false; history.back(); }
-  else navigate('/', { replace: true });
+  else navigate(viewerReturn, { replace: true });
 }
 export function restoreViewerFocus(): void {
   const element = origin;

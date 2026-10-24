@@ -4,6 +4,8 @@ import { isTouch } from '../lib/env';
 import { loadFirstPage, refresh, status } from '../store/files';
 import { filters, showToast, updateFilters } from '../store/ui';
 import { Icon, type IconName } from './Icon';
+import { selectMode } from '../store/selection';
+import { navigate } from '../lib/router';
 
 export function Header() {
   const [searching, setSearching] = useState(!!filters.value.q);
@@ -26,6 +28,7 @@ export function Header() {
     return () => { observer.disconnect(); clearTimeout(debounce.current); };
   }, []);
   useEffect(() => { if (searching && !isTouch()) input.current?.focus(); }, [searching]);
+  useEffect(() => { const search = () => { setSearching(true); requestAnimationFrame(() => input.current?.focus()); }; window.addEventListener('dump:search', search); return () => window.removeEventListener('dump:search', search); }, []);
   useEffect(() => {
     if (!menu) return;
     const close = (event: PointerEvent) => { if (!menuRoot.current?.contains(event.target as Node)) setMenu(false); };
@@ -40,10 +43,11 @@ export function Header() {
     if (filters.peek().q) { updateFilters({ q: '' }); void loadFirstPage(); window.scrollTo({ top: 0 }); }
   }
   const actions: { label: string; icon: IconName; run: () => void; busy?: boolean }[] = [
+    { label: 'Select', icon: 'check', run: () => { selectMode.value = true; } },
     { label: searching ? 'Close search' : 'Search files', icon: 'search', run: () => searching ? closeSearch() : setSearching(true) },
     { label: 'Refresh files', icon: 'refresh', run: () => { void refresh(); }, busy: status.value === 'loading' || status.value === 'loadingMore' },
   ];
-  const entries = [{ label: 'Sign out', run: async () => { try { await logout(); } catch { showToast("Couldn't sign out. Try again.", undefined, true); } } }];
+  const entries = [{ label: 'Trash', run: () => navigate('/trash') }, { label: 'Settings', run: () => navigate('/settings') }, { label: 'Sign out', run: async () => { try { await logout(); } catch { showToast("Couldn't sign out. Try again.", undefined, true); } } }];
   return <header ref={header} class="app-header"><div class="header-row page-width">
     <h1 class="app-title">Dump</h1>
     <div class="header-actions">
