@@ -47,3 +47,18 @@ export function ulid(): string {
   }
   return timePart + randomPart;
 }
+
+export const isUlid = (value: string): boolean => /^[0-9A-HJKMNP-TV-Z]{26}$/.test(value);
+export function ulidTime(id: string): number {
+  let time = 0;
+  for (const char of id.slice(0, 10)) time = time * 32 + alphabet.indexOf(char);
+  return time;
+}
+function encodeTime(ms: number): string {
+  if (!Number.isSafeInteger(ms) || ms < 0 || ms > maxTimestamp) throw new RangeError('Invalid ULID time.');
+  let part = '';
+  for (let index = 0; index < 10; index += 1) { part = alphabet[ms % 32] + part; ms = Math.floor(ms / 32); }
+  return part;
+}
+export const ulidFloor = (ms: number): string => encodeTime(ms) + '0'.repeat(16);
+export const ulidCeil = (ms: number): string => encodeTime(ms) + 'Z'.repeat(16);

@@ -20,3 +20,14 @@
 - Preserve unselected local secrets when combining --only with --write-dev-vars, so rotation cannot silently invalidate unrelated credentials.
 - Keep the login card minimal with system fonts, inline SVG, safe-area padding and light/dark contrast; discard the UI skill's unrelated marketing layout and external-font suggestions to follow the spec.
 - Preview the production CSP on Wrangler's static asset server rather than Vite's development injection; no production CSP relaxation is allowed.
+- Use JPEG thumbnails at quality 0.82 and longest side 480 px, with image/jpeg-only storage and serving, for the specified iOS-compatible client pipeline.
+- Trust client SHA-256 solely for duplicate detection; KV cannot verify it, and the Worker never hashes or buffers original file bodies.
+- Apply the approved Part 3 amendment: deleteMany returns failed and quotaExceeded, never throws, logs kv_delete_fail once without keys, and skips remaining delete groups after a quota failure.
+- Return DAILY_LIMIT after D1 deletion for bulk purge and Empty Trash when quotaExceeded is true; permanent single-file deletion still succeeds and leaves failed KV deletion for orphan cleanup.
+- Carry the approved amendment into Part 8: maintenance must stop purge/orphan KV steps on quotaExceeded and log maintenance_quota; do not implement maintenance in Part 3.
+- Cancel the fixed-length readable stream as well as aborting the pipe after a rejected KV put, preventing backpressure deadlock; map the installed workerd FixedLengthStream TypeError to StorageLengthError for short bodies.
+- Expose storageFor(env) inside storage.ts so no other Worker module directly accesses env.FILES; createStorage remains available for interface-focused tests.
+- Split off the last path segment before stripping forbidden filename characters, then enforce the MIME extension within 200 code points; remove isolated UTF-16 surrogates so filenames remain safely percent-encodable.
+- Use DELETE RETURNING in the atomic purge batch so only rows actually deleted produce KV deletes, avoiding removal of a concurrently restored file's objects.
+- Use 8 KB JSON for upload hash checks, 4 KB for file metadata, 16 KB for bulk actions, and 1 KB for settings, preserving the specified route limits.
+- Treat If-None-Match weak tags as matches for GET/HEAD as well as exact strong tags; conditional and HEAD responses never read KV.

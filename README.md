@@ -1,6 +1,6 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1 and 2 provide the foundation and secure sign-in. File operations arrive in later parts.
+Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–3 provide the foundation, secure sign-in, and authenticated file API. The browser currently shows the signed-in placeholder; gallery and upload UI arrive in later parts.
 
 Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
 
@@ -29,9 +29,31 @@ npm run dev
 
 Open http://localhost:5173 and sign in with the locally generated ACCESS_KEY. Vite proxies `/api` to Wrangler on port 8787, preserving the original host. `/api/health` returns `{"ok":true}`. `/api/nope` returns 401 without credentials and the NOT_FOUND envelope with status 404 after authentication. The initial build supplies Wrangler's static asset directory. Wrangler uses local D1 and KV during development; `npx wrangler dev --local --port 8787` explicitly selects local mode if needed.
 
-## Storage constraints for later parts
+## File API and free-plan storage
 
-Files will use KV keys `f/<id>` and thumbnails `t/<id>`, with `{ size, at }` metadata. All Worker KV access will be implemented through `worker/src/files/storage.ts` in Part 3. The revised design uses a 900 MB soft cap, counting originals, thumbnails, and Trash, below KV's 1 GB free allowance. KV limits values to 25 MiB; its read, write, delete, and list quotas must also be respected. Reads are eventually consistent, so new files can take 60 seconds or longer to become readable from another location. KV has no built-in file checksum verification or Range reads. The later storage implementation must account for these differences.
+Files use KV keys `f/<id>` and JPEG thumbnails `t/<id>`, with `{ size, at }` metadata. All Worker KV access goes through `worker/src/files/storage.ts`. Originals stream through FixedLengthStream and are never buffered or hashed in the Worker. Type sniffing happens before the first write; rejected types cost no KV writes. Client SHA-256 is trusted for duplicate detection only, not integrity verification.
+
+The API supports PNG, JPEG, GIF, WebP, and PDF originals up to 25 MiB, and JPEG thumbnails up to 150 KiB. Upload-token endpoints are POST `/api/upload`, `/api/upload/check`, `/api/thumb`, and GET `/api/auth/session`. Original uploads use a raw body and require Content-Length. Optional headers are a percent-encoded X-File-Name, X-Content-Sha256, and paired X-Width/X-Height. File metadata, paginated/filterable lists, tags, statistics, settings, Trash/restore and purge routes require the full session cookie.
+
+The 900 MB soft cap counts originals, thumbnails and Trash against KV's 1 GB free allowance. Settings are cached per isolate for 30 seconds, statistics for 60 seconds. Successful mutations adjust this isolate's cached totals immediately; other isolates and concurrent requests can temporarily see stale totals, so the cap is approximate. KV's daily read, write, delete and list quotas apply separately. Typical image uploads cost two writes, while moving to Trash and restoring cost no KV operations. Permanent deletion costs one delete for the original plus one only if a thumbnail exists. Bulk purge and Empty Trash process at most 100 files per call, with up to ten deletes in flight.
+
+Quota exhaustion during an upload returns 429 DAILY_LIMIT. During bulk purge or Empty Trash, D1 rows are already removed; the same error is returned and the Part 8 orphan sweep will remove leftover objects later. Single-file permanent deletion still returns success if KV deletion fails. No additional delete groups are started after a quota failure. Quotas reset at 00:00 UTC (06:00 Asia/Dhaka). Remaining orphan bytes may temporarily exceed the metadata-based storage estimate.
+
+KV reads are eventually consistent: new objects can take 60 seconds or longer to become readable from another location. A missing object returns 404 with Retry-After: 2 and no-store. Served files use long-lived private browser caching, never public caching. Originals use their id as the quoted ETag; thumbnails use id plus thumbnail size. Conditional requests and HEAD use D1 alone, saving KV reads. Range requests deliberately return the complete file with 200 and Accept-Ranges: none. KV has no public file URL.
+
+## Local end-to-end smoke test
+
+Start `npm run db:migrate:local` and `npm run dev:api` before the test. Use the plaintext access/upload credentials generated for that local server, not their hashes. In PowerShell, enter credentials without placing them in shell history:
+
+```powershell
+$env:SMOKE_BASE_URL = 'http://localhost:8787'
+$env:SMOKE_ACCESS_KEY = Read-Host 'Local access key' -MaskInput
+$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Local upload token' -MaskInput
+node scripts/smoke.mjs
+Remove-Item Env:SMOKE_ACCESS_KEY, Env:SMOKE_UPLOAD_TOKEN
+```
+
+`-MaskInput` requires PowerShell 7. The smoke script runs against local D1/KV, prints ten PASS/FAIL steps, creates only its own synthetic files, and removes its test files and restores settings afterward. Use an isolated local instance for this test: its Empty Trash check purges existing Trash too. It exercises original streaming, deduplication, rejected uploads, JPEG thumbnails, pagination/filtering, ETags, ignored ranges, metadata edits, duplicate restore conflicts, bulk actions, settings and authentication boundaries. `scripts/lib/png.mjs` generates valid PNG test data with Node zlib and CRC32, without dependencies.
 
 ## Checks
 

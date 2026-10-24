@@ -16,9 +16,8 @@ it('every non-public registered route denies anonymous requests and enforces bea
     seen.add(key);
     expect((await f.request(path, { method })).status, key).toBe(401);
     const response = await f.request(path, { method, headers: { Authorization: `Bearer ${upload}` } });
-    if (UPLOAD_SCOPE_ROUTES.includes(key)) expect(response.status, key).toBeGreaterThanOrEqual(200);
+    if (UPLOAD_SCOPE_ROUTES.includes(key)) expect([401, 403, 500], key).not.toContain(response.status);
     else { expect(response.status, key).toBe(403); expect(await response.json()).toMatchObject({ error: { code: 'FORBIDDEN_SCOPE' } }); }
-    if (UPLOAD_SCOPE_ROUTES.includes(key)) expect(response.status, key).toBeLessThan(300);
   }
   expect(seen.size).toBeGreaterThan(0);
 });
