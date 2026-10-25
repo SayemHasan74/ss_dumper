@@ -4,6 +4,8 @@
 
 Dump is a private, single-user screenshot and file inbox. Upload on your phone, then copy, download or manage the same files from any browser. It supports PNG, JPEG, WebP, GIF and PDF; no registration, sharing or public file links.
 
+Deployed URL: https://dump.sayemhasan74.workers.dev. Frontend and API are served by the same Cloudflare Worker. Sign in with the access key saved in your password manager. See the [deployment verification and phone checklist](docs/verification/deployment.md).
+
 ## Architecture in 6 lines
 
 1. One Cloudflare Worker serves the Preact app and authenticated Hono API.
@@ -17,7 +19,7 @@ Dump is a private, single-user screenshot and file inbox. Upload on your phone, 
 
 Use a **free Cloudflare account, no card, no R2**. Stay on Workers Free; stop if any command requests a paid subscription or payment method. Use Node **22.12+** and npm (the pinned toolchain requires it; verified locally on Node 24.20.0). CI uses Node 22. No deployment runs in CI.
 
-Run these commands yourself, in order, from this repository. Deployment was deliberately not performed by the implementing agent.
+Run these commands in order from this repository. The owner has authorized agent-run deployment to Cloudflare, overriding Part 8's earlier do-not-deploy instruction. Stop if any step requires a credit card or paid product.
 
 ```powershell
 npm install
@@ -151,7 +153,7 @@ Optional domain-only hardening (not required, no card): in Cloudflare choose you
 
 Products: **Workers**, **Workers Static Assets** (`ASSETS`), **D1** (`DB`), **Workers KV** (`FILES`), **Cron Triggers**, **Workers Observability**. All have free-plan allowances; no payment method or paid product is configured. No R2, Queues, Images, Stream or Durable Objects binding/dependency is used. Your account/payment-method state must be checked by you in the dashboard.
 
-Cloudflare currently includes 1 GB KV storage, 100,000 reads/day, and **1,000 writes/day, 1,000 deletes/day and 1,000 list requests/day separately**, resetting at 00:00 UTC = **06:00 Dhaka**. The spec's shared mutation counter is retained as a conservative maintenance budget, not a claim that Cloudflare combines these quotas. About 400 image uploads/day is a practical estimate allowing retries/backfill (usually two writes per image), not a guaranteed allowance. The app uses a 900,000,000-byte approximate soft cap and a 25 MiB original limit, not 25 decimal MB.
+Cloudflare currently includes 1 GB KV storage, 100,000 reads/day, and **1,000 writes/day, 1,000 deletes/day and 1,000 list requests/day separately**, resetting at 00:00 UTC = **06:00 Dhaka**. The spec's shared mutation counter is retained as a conservative maintenance budget, not a claim that Cloudflare combines these quotas. About 500 image uploads/day is an estimate at two writes per image (original plus thumbnail); retries and thumbnail backfill consume additional writes and reduce that number. Deletes and lists have their own separate daily allowances. The app uses a 900,000,000-byte approximate soft cap and a 25 MiB original limit, not 25 decimal MB.
 
 Workers Free includes 100,000 dynamic requests/day and a 10 ms CPU allowance per invocation; static asset requests are free/unlimited under current pricing. D1 Free includes 5 million rows read/day, 100,000 rows written/day and 5 GB total storage. Search/tag/pin/type filtering may inspect more rows than returned; date/cursor filters use indexed ULID ranges. Large metadata totals and maintenance can still consume D1/CPU quotas. Local timing is evidence for this machine, not a promise about Cloudflare CPU or remote network latency.
 
