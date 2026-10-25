@@ -33,3 +33,14 @@ Deployed on 25 October 2026 with the owner's explicit permission, overriding the
 - Sign out everywhere and confirm the other device loses access within 30 seconds.
 
 These phone behaviors require physical-device testing; the HTTPS smoke test does not establish Safari/Home Screen behavior.
+
+## iPhone batch-upload memory fix, 25 October 2026
+
+- Reported symptom: a 66-photo upload added only some files, followed by an apparent page reload and loss of the pending queue.
+- Found eager original-file preview URLs feeding both the virtual gallery and expanded upload tray, allowing many large image decodes outside bounded thumbnail preparation. This is a concrete memory hazard consistent with the symptom, not a confirmed physical-device crash diagnosis.
+- Removed original preview URLs. Queued files use placeholders until their small JPEG thumbnails are prepared. Original upload bodies are unchanged; fallback thumbnail Image handlers/source are released explicitly.
+- A 66-file regression fails against the previous queue implementation and passes with the fix, verifying all 66 complete, all preview URLs refer to thumbnail blobs and all upload bodies are the original File objects.
+- Typecheck and all 96 tests passed; deployment build and bundle budgets passed (JS gzip 32,562 / 40,960 bytes, CSS gzip 7,651 / 10,240 bytes).
+- The first remote migration check hit transient Cloudflare error 7403. A sequential retry succeeded, with no migrations needed; no schema, quotas, retention settings or user files were changed.
+- Deployed version `d32be7bc-94e4-4892-ae3f-d7911e20fd72`; HTTPS production smoke passed, including cleanup of only its own fixture.
+- Owner retry: reload the app once before selecting files, then retry the 66-photo selection while keeping the app open. Byte-identical files already stored are skipped by existing duplicate detection. Physical iPhone verification remains pending.

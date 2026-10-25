@@ -33,9 +33,6 @@ function publish(): void {
 }
 function update(job: Job, changes: Partial<LocalFile>): void { Object.assign(job.item, changes); publish(); }
 function release(job: Job): void { if (job.item.previewUrl) URL.revokeObjectURL(job.item.previewUrl); job.item.previewUrl = ''; }
-function ensurePreview(job: Job): void {
-  if (!job.item.previewUrl && job.valid && job.item.mime.startsWith('image/')) job.item.previewUrl = URL.createObjectURL(job.file);
-}
 function paused(): void {
   for (const batch of batches) batch.controller?.abort();
   for (const job of jobs) if (!terminal(job.item.status)) {
@@ -143,7 +140,7 @@ async function run(job: Job): Promise<void> {
 }
 function pump(): void {
   if (!permitted()) return;
-  for (const job of jobs) if (!terminal(job.item.status) && !job.controller) { ensurePreview(job); if (job.item.status === 'waiting') job.item.status = 'queued'; }
+  for (const job of jobs) if (!terminal(job.item.status) && !job.controller && job.item.status === 'waiting') job.item.status = 'queued';
   for (const batch of batches) if (!batch.ready && !batch.running && batch.jobs.some((job) => !terminal(job.item.status))) void checkBatch(batch);
   const connection = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
   const limit = connection?.saveData || ['2g', 'slow-2g'].includes(connection?.effectiveType ?? '') ? 2 : 3;
@@ -163,7 +160,7 @@ export function enqueue(files: File[], pasted = false): void {
     const localId = `local-${++nextId}`;
     const item: LocalFile = { id: localId, localId, name: uploadName(file, index, pasted), mime: mime ?? file.type, size: file.size, width: null, height: null, thumbSize: 0, note: '', pinned: false, tags: [], createdAt: file.lastModified || Date.now(), deletedAt: null, expiresAt: null, status: message ? 'failed' : halted ? 'failed' : 'queued', progress: 0, previewUrl: '', message: message || (halted ? queueMessage.peek() : 'Queued') };
     const job: Job = { item, file, hash: '', valid: !message };
-    ensurePreview(job); jobs.push(job); batch.jobs.push(job);
+    jobs.push(job); batch.jobs.push(job);
   }
   batches.push(batch); publish();
   if (!navigator.onLine) paused(); else pump();

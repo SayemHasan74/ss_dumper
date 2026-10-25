@@ -107,7 +107,7 @@ Follow [the complete iPhone Shortcut guide](docs/ios-shortcut.md) for Share Shee
 ## Daily use
 
 - Tap **+** and choose up to 100 supported files, at most 25 MiB each. Desktop also supports drop and paste outside editors. iOS includes its normal extra picker tap.
-- Thumbnails appear immediately. Preparation has two slots and uploads have three (two on slow/data-saving connections); retry, cancel and progress are in the upload tray. Offline queues wait; closing the tab loses unfinished files. Keep the app open while uploading.
+- Queued images show placeholders until their small thumbnails are prepared; full-size originals are never used as gallery/tray previews. Preparation has two slots and uploads have three (two on slow/data-saving connections); retry, cancel and progress are in the upload tray. Offline queues wait; closing the tab loses unfinished files. Keep the app open while uploading.
 - Filter by name, date, file type, pin or tag. Scrolling uses a virtualized grid; refresh merges new files while preserving older pages. The new-files pill lets you choose when to insert items while scrolled down.
 - Open a file for its original. Use arrows/swipes, zoom/pan or open/download PDFs. Back/Escape closes the viewer.
 - Tap **Select**, long-press a cell, or use desktop Ctrl/Cmd-click and Shift-click. Select loaded items or Everything matching (up to 2,000).

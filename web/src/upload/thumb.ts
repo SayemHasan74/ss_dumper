@@ -1,6 +1,7 @@
 export interface Thumbnail { blob: Blob; width: number; height: number }
 export async function createThumbnail(blob: Blob): Promise<Thumbnail | null> {
   let bitmap: ImageBitmap | undefined;
+  let image: HTMLImageElement | undefined;
   let url = '';
   try {
     let source: CanvasImageSource;
@@ -10,8 +11,8 @@ export async function createThumbnail(blob: Blob): Promise<Thumbnail | null> {
       source = bitmap; width = bitmap.width; height = bitmap.height;
     } catch {
       url = URL.createObjectURL(blob);
-      const image = new Image();
-      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Decode failed')); image.src = url; });
+      const fallback = new Image(); image = fallback;
+      await new Promise<void>((resolve, reject) => { fallback.onload = () => resolve(); fallback.onerror = () => reject(new Error('Decode failed')); fallback.src = url; });
       source = image; width = image.naturalWidth; height = image.naturalHeight;
     }
     if (!width || !height) return null;
@@ -27,5 +28,5 @@ export async function createThumbnail(blob: Blob): Promise<Thumbnail | null> {
       : await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
     return jpeg ? { blob: jpeg, width, height } : null;
   } catch { return null; }
-  finally { bitmap?.close(); if (url) URL.revokeObjectURL(url); }
+  finally { bitmap?.close(); if (image) { image.onload = image.onerror = null; image.removeAttribute('src'); } if (url) URL.revokeObjectURL(url); }
 }
