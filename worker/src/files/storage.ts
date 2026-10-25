@@ -62,8 +62,10 @@ export function createStorage(kv: KVNamespace): Storage {
       return { failed, quotaExceeded };
     },
     async list(cursor, limit) {
-      const result = await kv.list<StoredMeta>({ cursor, limit: Math.max(1, Math.min(1000, limit)) });
-      return { keys: result.keys.map((key) => ({ name: key.name, meta: metadata(key.metadata) })), cursor: result.list_complete ? null : result.cursor };
+      try {
+        const result = await kv.list<StoredMeta>({ cursor, limit: Math.max(1, Math.min(1000, limit)) });
+        return { keys: result.keys.map((key) => ({ name: key.name, meta: metadata(key.metadata) })), cursor: result.list_complete ? null : result.cursor };
+      } catch (error) { if (quotaError(error)) throw new StorageQuotaError(); throw error; }
     },
   };
 }

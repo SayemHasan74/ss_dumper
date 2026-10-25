@@ -7,7 +7,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev:api": "wrangler dev --port 8787",
+    "dev:api": "wrangler dev --port 8787 --test-scheduled",
     "dev:web": "vite",
     "dev": "concurrently -k \"npm run dev:api\" \"npm run dev:web\"",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
@@ -15,23 +15,25 @@
     "db:migrate:local": "wrangler d1 migrations apply dump-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply dump-db --remote",
     "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy",
-    "test": "vitest run"
+    "test": "node scripts/check-security.mjs && vitest run",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:maintenance": "node scripts/smoke-maintenance.mjs"
   },
   "dependencies": {
-    "@preact/signals": "^2.11.3",
+    "@preact/signals": "2.11.3",
     "fflate": "0.8.3",
-    "hono": "^4.13.13",
-    "preact": "^11.0.2"
+    "hono": "4.13.13",
+    "preact": "11.0.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261024.1",
-    "@preact/preset-vite": "^2.10.6",
-    "@tailwindcss/vite": "^4.3.3",
-    "concurrently": "^10.0.6",
-    "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.5",
-    "vitest": "^5.0.5",
-    "wrangler": "^4.152.0"
+    "@cloudflare/workers-types": "5.20261024.1",
+    "@preact/preset-vite": "2.10.6",
+    "@tailwindcss/vite": "4.3.3",
+    "concurrently": "10.0.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "wrangler": "4.152.0"
   }
 }

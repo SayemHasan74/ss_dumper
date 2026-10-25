@@ -2,6 +2,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import { makePng } from './lib/png.mjs';
 
 const base = (process.env.SMOKE_BASE_URL ?? 'http://localhost:8787').replace(/\/$/, '');
+const production = new URL(base).protocol === 'https:' || process.argv.includes('--prod');
+if (new URL(base).protocol === 'https:' && !process.argv.includes('--prod')) {
+  console.error('HTTPS requires --prod; refusing the destructive local suite.'); process.exit(1);
+}
 const access = process.env.SMOKE_ACCESS_KEY;
 const token = process.env.SMOKE_UPLOAD_TOKEN;
 if (!access || !token) {
@@ -45,6 +49,13 @@ try {
   check(login.status === 200, 'Login failed.');
   cookie = login.headers.get('set-cookie')?.split(';')[0] ?? '';
   check(Boolean(cookie), 'No session cookie returned.');
+  if (production) {
+    console.log('Production safe subset: one tiny unique PNG; about 3 KV operations (1 write, 1 read, 1 delete). No settings changes or Empty Trash.');
+    const item = await add(`${prefix}.png`);
+    await step('production list only the test file', async () => check((await json(`/api/files?q=${prefix}`)).files.some(file => file.id === item.file.id), 'Test upload missing from list.'));
+    await step('production authenticated fetch', async () => { const response = await request(`/api/files/${item.file.id}/original`); check(response.ok && Buffer.from(await response.arrayBuffer()).equals(item.bytes), 'Original fetch failed.'); });
+    await step('production trash and purge only the test file', async () => { await json(`/api/files/${item.file.id}`, { method: 'DELETE' }); await json(`/api/files/${item.file.id}/permanent`, { method: 'DELETE' }); created.delete(item.file.id); });
+  } else {
   savedSettings = await json('/api/settings');
   let first;
   let second;
@@ -147,7 +158,11 @@ try {
     check((await request('/api/files',{bearer:true})).status===403,'Bearer read access allowed.');
     check((await request('/api/files',{anonymous:true})).status===401,'Anonymous access allowed.');
     check((await request('/api/settings',{method:'PATCH',json:{trashDays:7},csrf:false})).status===403,'Mutation without CSRF header allowed.');
+    check((await request('/api/settings',{method:'PATCH',json:{trashDays:7},headers:{Origin:'https://wrong.example'}})).status===403,'Wrong Origin allowed.');
+    check((await request('/api/settings',{method:'PATCH',json:{trashDays:7},headers:{'Sec-Fetch-Site':'cross-site'}})).status===403,'Cross-site mutation allowed.');
+    check((await request('/api/files',{headers:{'Sec-Fetch-Site':'cross-site'}})).status===403,'Cross-site read allowed.');
   });
+  }
 } catch (error) {
   console.error(`FAIL ${error instanceof Error ? error.message : 'Smoke test failed.'}`);
   process.exitCode=1;

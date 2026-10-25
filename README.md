@@ -1,166 +1,246 @@
 # Dump
 
-Private, single-user file dump served by one Cloudflare Worker with Workers Static Assets, private Workers KV file storage, and D1 metadata. Parts 1–7 provide secure sign-in, the file API, virtualized gallery, uploads, viewer, copy workflows, Trash/settings, PWA installation and an iPhone Shortcut guide. Cleanup and deployment verification arrive in Part 8.
+## What it is
 
-Use Cloudflare's Free plan without adding a payment method. Do not enable R2 or any paid product. If a setup command requests a paid subscription or card, stop rather than accepting it.
+Dump is a private, single-user screenshot and file inbox. Upload on your phone, then copy, download or manage the same files from any browser. It supports PNG, JPEG, WebP, GIF and PDF; no registration, sharing or public file links.
 
-## First-time setup
+## Architecture in 6 lines
 
-Use Node 22.12+ and npm; the selected current toolchain requires this minimum within the spec's Node 20+ range. This project was verified with Node 24.20.0. Run all commands from this repository root.
+1. One Cloudflare Worker serves the Preact app and authenticated Hono API.
+2. Workers Static Assets hosts the public, data-free HTML/JS/CSS shell.
+3. D1 (`DB`) stores metadata, tags, settings and authentication counters.
+4. Private Workers KV (`FILES`) stores originals and client-generated thumbnails.
+5. A server-issued HttpOnly cookie provides long-lived browser sign-in; a separate token permits uploads only.
+6. Cron runs bounded maintenance; the service worker caches only the public shell and static assets.
 
-1. Run `npm install`, then `npx wrangler login`.
-2. Create a KV namespace with `npx wrangler kv namespace create FILES`. Paste its returned namespace ID into the `[[kv_namespaces]]` block in `wrangler.toml`, keeping `binding = "FILES"`. For this existing account, the namespace named `dump-files` is already created and its verified ID is configured; skip creation.
-3. Create the database with `npx wrangler d1 create dump-db`. Paste its returned database ID into `wrangler.toml`. For this existing account, `dump-db` is already created and its verified ID is configured; skip creation.
-4. Run `node scripts/generate-secrets.mjs --write-dev-vars` in your own terminal. Save ACCESS_KEY and UPLOAD_TOKEN in your password manager immediately; they cannot be recovered. The script displays them once and writes only their hashes plus SESSION_SECRET into `.dev.vars`.
-5. Run each of the three displayed `npx wrangler secret put ...` commands and paste the corresponding value when prompted: ACCESS_KEY_HASH, UPLOAD_TOKEN_HASH, and SESSION_SECRET.
-6. Run `npm run deploy`. This typechecks, builds, checks bundle budgets, applies remote migrations, and deploys the Worker and assets.
+## First-time setup and deployment
 
-Never commit `.dev.vars` or plaintext credentials. `.dev.vars` is ignored by Git. Running the generator again replaces the local secrets; save the newly generated credentials and update remote secrets together if rotating them.
+Use a **free Cloudflare account, no card, no R2**. Stay on Workers Free; stop if any command requests a paid subscription or payment method. Use Node **22.12+** and npm (the pinned toolchain requires it; verified locally on Node 24.20.0). CI uses Node 22. No deployment runs in CI.
+
+Run these commands yourself, in order, from this repository. Deployment was deliberately not performed by the implementing agent.
+
+```powershell
+npm install
+npx wrangler login
+npx wrangler kv namespace create FILES
+npx wrangler d1 create dump-db
+```
+
+Paste the returned namespace and database IDs into `wrangler.toml`, retaining bindings `FILES` and `DB`. **For the existing project account, `dump-files` and `dump-db` are already created and configured: skip the two create commands and verify those IDs instead.** `FILES` is the binding name; the dashboard namespace may be called `dump-files`.
+
+```powershell
+node scripts/generate-secrets.mjs --write-dev-vars
+```
+
+Save ACCESS_KEY and UPLOAD_TOKEN in a password manager immediately. They cannot be recovered. The script prints the three secret values to enter below; `.dev.vars` contains only their hashes and SESSION_SECRET. Do not regenerate existing credentials casually: this command creates new ones.
+
+```powershell
+npx wrangler secret put ACCESS_KEY_HASH
+npx wrangler secret put UPLOAD_TOKEN_HASH
+npx wrangler secret put SESSION_SECRET
+npm run deploy
+```
+
+Enter each corresponding generated value at its prompt. `deploy` builds, checks budgets, applies remote migrations and deploys the Worker plus assets. If Wrangler asks to create the not-yet-deployed Worker while setting secrets, allow creation of this free Worker. Open the HTTPS URL printed by Wrangler, normally `https://dump.<your-subdomain>.workers.dev`.
+
+Verify the live app with the safe smoke subset, using **PowerShell 7** masked prompts (these keep credentials out of command history):
+
+```powershell
+$env:SMOKE_BASE_URL = 'https://<your-worker-url>'
+$env:SMOKE_ACCESS_KEY = Read-Host 'Access key' -MaskInput
+$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Upload token' -MaskInput
+node scripts/smoke.mjs --prod
+Remove-Item Env:SMOKE_ACCESS_KEY, Env:SMOKE_UPLOAD_TOKEN, Env:SMOKE_BASE_URL
+```
+
+The production test logs in, uploads one unique tiny PNG, lists/fetches it and trashes/purges **only that file**: about three KV operations (write, read, delete). It never changes settings or empties existing Trash. HTTPS without `--prod` is refused. A just-written file may require retrying after propagation; failed fixture cleanup is reported. Never commit `.dev.vars`, `.env`, local state, credentials or backups.
 
 ## Local development
 
-After installing dependencies, generate local secrets as above. Local development simulates D1 and KV on disk; the configured IDs do not enable remote access in local mode, and placeholder IDs also work locally.
+Generate local secrets with `node scripts/generate-secrets.mjs --write-dev-vars` and keep their plaintext keys in your password manager. Then:
 
-```sh
+```powershell
 npm run build
 npm run db:migrate:local
 npm run dev
 ```
 
-Open http://localhost:5173 and sign in with the locally generated ACCESS_KEY. Vite proxies `/api` to Wrangler on port 8787, preserving the original host. `/api/health` returns `{"ok":true}`. `/api/nope` returns 401 without credentials and the NOT_FOUND envelope with status 404 after authentication. The initial build supplies Wrangler's static asset directory. Wrangler uses local D1 and KV during development; `npx wrangler dev --local --port 8787` explicitly selects local mode if needed.
-
-## Gallery and viewer
-
-The signed-in gallery follows the system light/dark theme and uses window scrolling with a virtualized square grid. Search, file type, local-day/time, pin and tag filters are temporary. Refresh merges the newest page; when scrolled down, a new-files pill waits for your tap before inserting files. The gallery stays mounted behind the lazy-loaded viewer, preserving loaded pages and scroll position.
-
-Open a cell to view its original; use arrow keys, chevrons or touch swipes to navigate. Click an image or double-tap on touch to change zoom. Escape exits zoom first, then closes; Back also closes the viewer. PDFs have authenticated Open and Download links. New images retry a missing thumbnail/original once after three seconds to allow for KV propagation. Older failures require explicit retry for originals.
-
-For local performance testing, use an isolated local database/KV instance: synthetic files remain until you delete them. With the local server running, PowerShell 7 can prompt for the local upload token without saving it in shell history:
+Open http://localhost:5173. Vite proxies the API to Wrangler on 8787. Local D1 and KV are simulated on disk in `.wrangler/state`; no remote data or quota is used. For the production build/CSP preview, use http://localhost:8787 after building. `npm run dev:api` includes `--test-scheduled`.
 
 ```powershell
-$env:SMOKE_BASE_URL = 'http://localhost:8787'
-$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Local upload token' -MaskInput
-node scripts/seed.mjs 300
-Remove-Item Env:SMOKE_UPLOAD_TOKEN
-```
-
-The default count is 300; use 5000 for the larger scrolling check. The script creates unique 64×64 PNGs, four uploads at a time, and prints counts only. HTTPS targets are refused unless `--force` is explicitly supplied, since each upload consumes live KV write quota. The script never runs in CI. Part 4 measurements and test limits are recorded in [the verification report](docs/verification/part-4.md).
-
-## Uploading
-
-Tap the round + button to choose up to 100 PNG, JPEG, WebP, GIF or PDF files, each at most 25 MiB. On iPhone, the native Photo Library / Take Photo / Choose Files sheet appears once, followed by the normal multi-select picker. The file input opens through its native label, without a JavaScript `input.click()`. HEIC/HEIF is excluded; iOS can convert photos to JPEG for the supported picker types. A real iPhone/Safari check is still needed; local verification uses touch emulation in Edge Chromium.
-
-On desktop, drop files anywhere in the app or paste images while focus is outside an editor. New cells appear immediately. Images get a local JPEG thumbnail (480 px longest side, quality 0.82, white background); generic photo-picker names become `screenshot-…`, and pasted images become `pasted-…`. PDF originals have no thumbnail. SHA-256 and a batched preflight skip duplicates before uploading; the server also checks duplicates.
-
-The upload tray sits above +. Tap its summary to inspect file progress, retry failed files, cancel work or clear finished entries. Upload concurrency is three, or two for a slow/data-saving connection; hashing and thumbnail preparation share two slots. The queue waits offline and resumes on reconnect. If a session expires, sign in again to resume the same in-memory files. Closing/reloading the tab loses this queue, so an unfinished queue triggers the browser's leave-page warning. A screen wake lock is requested when supported; browsers may deny or release it, and background suspension can still interrupt work.
-
-Network/timeouts and retryable responses have at most three retries with backoff. Daily quota exhaustion stops the queue and offers manual Retry after the quota resets. A full storage response also stops the queue. If an original succeeds but its thumbnail fails, the original remains added. When uploads are idle and the app is visible/online, a background job fills missing image thumbnails one at a time (originals up to 15 MiB, at most two attempts per image per signed-in session). A daily-limit response stops backfill for that session.
-
-Preview URLs remain in memory for the signed-in session to hide storage propagation delays. Cancellation/clearing a local item revokes its preview; sign-out revokes all local and completed previews. Nothing in the queue is saved to browser storage. Images generally cost two KV writes, originals plus thumbnails. See [Part 5 verification](docs/verification/part-5.md) for measured behavior and limitations.
-
-## Select, copy and manage files
-
-Tap Select in the header or long-press a cell for half a second. On desktop, use the hover check, Ctrl/Cmd-click to toggle or Shift-click for a range. Escape/Clear, filter/search changes and successful destructive actions clear selection. The Select menu can choose loaded files by date/type, or page through everything matching the current filters up to 2,000 files. On a phone, Copy and Delete live in the bottom toolbar; + is hidden while selecting.
-
-Copy one image, then paste into your chat. JPEG/GIF/WebP sources are converted to PNG. PDFs use Download/Open/Share. For several images, the Copy Queue copies the first immediately and offers Copy next after each paste. One by one copies separate images; One image combines them into white PNG sheets, at most six screenshots per sheet with additional size/area limits. Both modes order screenshots oldest first, regardless of selection order. The mode is remembered in `dump.copyMode`; at most two prepared entries are cached in memory. If copying is unavailable or denied, the app offers Download instead.
-
-Download one file directly, or several as a browser-built store-only ZIP with unique names (300 MiB combined limit). Share appears only when the browser supports the actual selected Files, up to ten at once. Delete moves files to Trash immediately with a six-second Undo toast. Pin protects files from auto-delete; Tag adds/removes a normalized tag; Edit changes one file's name, note and tags. Failed mutations roll back while keeping the selection. Permanent deletion is available only for trashed files and requires confirmation.
-
-Open Trash or Settings from the header menu. Trash supports restore, permanent delete and Empty Trash, and reports skipped duplicate restores. If permanent deletion hits the daily storage limit, the app stops; already-deleted database rows remain deleted and Part 8 orphan cleanup will handle their leftover storage. Unsubmitted files remain available. Settings shows active/Trash storage usage, auto-delete and Trash retention, build information, Sign out and Sign out everywhere. The latter invalidates other sessions immediately in the same isolate and within 30 seconds in other isolates.
-
-Keyboard: Ctrl/Cmd+A selects loaded files, Ctrl/Cmd+C copies selected images (or the current viewer image), Delete trashes selection, / opens search, and Escape closes the innermost dialog/queue/viewer or clears selection. Viewer shortcuts also include Backspace to delete and P to pin. Dialogs trap and restore focus. See [Part 6 verification](docs/verification/part-6.md) for browser coverage and remaining Safari/device verification.
-
-## File API and free-plan storage
-
-Files use KV keys `f/<id>` and JPEG thumbnails `t/<id>`, with `{ size, at }` metadata. All Worker KV access goes through `worker/src/files/storage.ts`. Originals stream through FixedLengthStream and are never buffered or hashed in the Worker. Type sniffing happens before the first write; rejected types cost no KV writes. Client SHA-256 is trusted for duplicate detection only, not integrity verification.
-
-The API supports PNG, JPEG, GIF, WebP, and PDF originals up to 25 MiB, and JPEG thumbnails up to 150 KiB. Upload-token endpoints are POST `/api/upload`, `/api/upload/check`, `/api/thumb`, and GET `/api/auth/session`. Original uploads use a raw body and require Content-Length. Optional headers are a percent-encoded X-File-Name, X-Content-Sha256, and paired X-Width/X-Height. File metadata, paginated/filterable lists, tags, statistics, settings, Trash/restore and purge routes require the full session cookie.
-
-The 900 MB soft cap counts originals, thumbnails and Trash against KV's 1 GB free allowance. Settings are cached per isolate for 30 seconds, statistics for 60 seconds. Successful mutations adjust this isolate's cached totals immediately; other isolates and concurrent requests can temporarily see stale totals, so the cap is approximate. KV's daily read, write, delete and list quotas apply separately. Typical image uploads cost two writes, while moving to Trash and restoring cost no KV operations. Permanent deletion costs one delete for the original plus one only if a thumbnail exists. Bulk purge and Empty Trash process at most 100 files per call, with up to ten deletes in flight.
-
-Quota exhaustion during an upload returns 429 DAILY_LIMIT. During bulk purge or Empty Trash, D1 rows are already removed; the same error is returned and the Part 8 orphan sweep will remove leftover objects later. Single-file permanent deletion still returns success if KV deletion fails. No additional delete groups are started after a quota failure. Quotas reset at 00:00 UTC (06:00 Asia/Dhaka). Remaining orphan bytes may temporarily exceed the metadata-based storage estimate.
-
-KV reads are eventually consistent: new objects can take 60 seconds or longer to become readable from another location. A missing object returns 404 with Retry-After: 2 and no-store. Served files use long-lived private browser caching, never public caching. Originals use their id as the quoted ETag; thumbnails use id plus thumbnail size. Conditional requests and HEAD use D1 alone, saving KV reads. Range requests deliberately return the complete file with 200 and Accept-Ranges: none. KV has no public file URL.
-
-## Local end-to-end smoke test
-
-Start `npm run db:migrate:local` and `npm run dev:api` before the test. Use the plaintext access/upload credentials generated for that local server, not their hashes. In PowerShell, enter credentials without placing them in shell history:
-
-```powershell
-$env:SMOKE_BASE_URL = 'http://localhost:8787'
-$env:SMOKE_ACCESS_KEY = Read-Host 'Local access key' -MaskInput
-$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Local upload token' -MaskInput
-node scripts/smoke.mjs
-Remove-Item Env:SMOKE_ACCESS_KEY, Env:SMOKE_UPLOAD_TOKEN
-```
-
-`-MaskInput` requires PowerShell 7. The smoke script runs against local D1/KV, prints ten PASS/FAIL steps, creates only its own synthetic files, and removes its test files and restores settings afterward. Use an isolated local instance for this test: its Empty Trash check purges existing Trash too. It exercises original streaming, deduplication, rejected uploads, JPEG thumbnails, pagination/filtering, ETags, ignored ranges, metadata edits, duplicate restore conflicts, bulk actions, settings and authentication boundaries. `scripts/lib/png.mjs` generates valid PNG test data with Node zlib and CRC32, without dependencies.
-
-## Install on iPhone or desktop
-
-1. After deployment, open your HTTPS Dump address in Safari on the iPhone.
-2. Tap Share, then Add to Home Screen. The gallery's dismissible install hint explains the same steps.
-3. Open the new Dump icon and sign in once inside it. The installed Home Screen app has its own login, separate from Safari.
-4. On Chromium browsers, Settings → Install shows Install app when the browser offers an install prompt. Otherwise use the browser's install menu if available.
-
-The app follows system light/dark styling, uses safe-area padding and keeps the specified default iOS status-bar style. Fixed upload/activity controls move above a reduced visual viewport when search is focused. Physical iPhone checks for keyboard behavior, status bar, notch/home indicator, clipboard and separate login persistence remain necessary; Chromium emulation is not an iPhone test.
-
-## Offline shell and updates
-
-Production builds register `/sw.js` after window load. The hand-written service worker runtime-caches only the public shell, hashed assets, icons and manifest, with a 60-entry FIFO cap. It bypasses every `/api/` request, non-GET, cross-origin and Range request. Navigations try the network for 2.5 seconds before using the cached shell. Browser caching of originals retains the private policy described above; the service worker does not cache originals, metadata or sessions.
-
-The first visit installs the worker without a precache list. Open/reload online under its control to warm the shell before testing an offline launch. Offline launch displays anonymous placeholders and You're offline; it does not open the authenticated gallery or restore a file list. Reconnecting checks the session with the server again.
-
-A changed service worker waits until you press Reload on the Update ready toast. Foreground update checks run at most once per ten minutes. Changes only to hashed app assets take effect on the next online load; a new-worker toast requires changed service-worker bytes. Finish uploads before accepting a reload; an in-memory queue cannot survive it. Service-worker caching is disabled in Vite development mode. Static assets remain on Workers Static Assets; no paid service was added.
-
-Icons are committed outputs, generated independently of the build with `node scripts/make-icons.mjs`. The generator uses Node's built-in PNG/zlib primitives and 4×4 supersampling, without an image library. See [Part 7 verification](docs/verification/part-7.md) for measured results and device limitations.
-
-## iPhone Shortcuts
-
-Follow [the numbered Shortcut guide](docs/ios-shortcut.md) to build Dump in the Share Sheet and Dump latest screenshots for the Action Button, Back Tap or Home Screen. Settings → iPhone Shortcut supplies your current Upload URL and a collapsible checklist. Use the separate upload token from your password manager, never your sign-in key or a token hash. The token is not displayed or stored by the app; keep the configured Shortcut private and never share it through an iCloud link.
-
-The Shortcut converts HEIC/HEIF to JPEG, URL-encodes names and sends a raw File POST. Optional SHA256 enables duplicate detection; missing thumbnails are backfilled when the web app is open. The guide includes a token test, rotation commands and the HTTP troubleshooting table. Actual Shortcut execution and File-body Content-Length must be verified on an iPhone after deployment.
-
-## Checks
-
-```sh
 npm run typecheck
 npm test
 npm run build
 ```
 
-The build enforces initial gzip budgets of 40 KB JS and 10 KB CSS (1024 bytes per KB), excluding lazy chunks not referenced by the built HTML. `npm test` runs the authentication, crypto, session, route coverage, storage interface, and security-header unit tests. For a production-CSP preview, build and open http://localhost:8787; Vite's development server intentionally injects development tooling and is not the production-CSP test target.
+With the local server running, set the three smoke variables and run the API and maintenance suites:
 
-The scheduled handler is intentionally empty until Part 8. The daily trigger is 21:00 UTC (03:00 Asia/Dhaka the following day).
+```powershell
+$env:SMOKE_BASE_URL = 'http://localhost:8787'
+$env:SMOKE_ACCESS_KEY = Read-Host 'Local access key' -MaskInput
+$env:SMOKE_UPLOAD_TOKEN = Read-Host 'Local upload token' -MaskInput
+npm run test:smoke
+npm run test:maintenance
+Remove-Item Env:SMOKE_ACCESS_KEY, Env:SMOKE_UPLOAD_TOKEN, Env:SMOKE_BASE_URL
+```
+
+**Use an isolated local dataset:** the full API suite tests Empty Trash; maintenance expires/purges eligible existing rows. Both clean up their synthetic fixtures and restore settings. Maintenance is refused for non-loopback/HTTPS servers. Wait 60 seconds between manual cleanup runs. Optional `SMOKE_WRANGLER_CONFIG` and `SMOKE_PERSIST_TO` let its CLI fixtures share an isolated server's config/state. On Windows the script executes the installed Wrangler Node entrypoint with an argument array, avoiding a shell around `npx.cmd`.
+
+`node scripts/seed.mjs 1000` uploads synthetic PNGs to the local server using SMOKE_UPLOAD_TOKEN; default count is 300. Never seed a live free-plan namespace. The seed utility refuses HTTPS unless explicitly passed `--force`. Tests use no credentials in CI. Unit tests cover worker security/storage/maintenance and frontend pure planning functions; the source check enforces centralized JSON parsing and the storage boundary.
+
+## Use it from any device
+
+Open the same HTTPS address on your phone, Mac or Windows browser. Sign in once per browser with ACCESS_KEY; the server renews the login for weeks, up to a 180-day absolute lifetime. Keep your key and upload token in a password manager. They are never placed in browser storage or URLs.
+
+## Install on iPhone
+
+Open the address in Safari → Share → Add to Home Screen. Open the new Dump icon and **sign in once inside the installed app**; iPhone uses a separate login from Safari. Desktop browsers may offer Install app in Settings or their own install menu.
+
+The first visit installs the service worker; reload online under its control to warm the public shell before an offline launch. Offline startup shows anonymous skeletons and “You're offline”, without restoring private files. Reconnection checks authentication again. Changed service-worker bytes produce an Update ready → Reload toast; app-only hashed-asset changes load on the next navigation. Finish uploads before reloading: queued files live only in memory.
+
+## Share-sheet upload
+
+Follow [the complete iPhone Shortcut guide](docs/ios-shortcut.md) for Share Sheet and latest-screenshots shortcuts. Settings supplies the Upload URL and checklist. Use UPLOAD_TOKEN with `Authorization: Bearer <token>`, raw File body, an encoded filename and optional SHA-256 of the actual uploaded bytes. Convert HEIC/HEIF to JPEG first. Keep the configured Shortcut private. Shortcut originals receive thumbnails after the app next opens and backfill runs.
+
+## Daily use
+
+- Tap **+** and choose up to 100 supported files, at most 25 MiB each. Desktop also supports drop and paste outside editors. iOS includes its normal extra picker tap.
+- Thumbnails appear immediately. Preparation has two slots and uploads have three (two on slow/data-saving connections); retry, cancel and progress are in the upload tray. Offline queues wait; closing the tab loses unfinished files. Keep the app open while uploading.
+- Filter by name, date, file type, pin or tag. Scrolling uses a virtualized grid; refresh merges new files while preserving older pages. The new-files pill lets you choose when to insert items while scrolled down.
+- Open a file for its original. Use arrows/swipes, zoom/pan or open/download PDFs. Back/Escape closes the viewer.
+- Tap **Select**, long-press a cell, or use desktop Ctrl/Cmd-click and Shift-click. Select loaded items or Everything matching (up to 2,000).
+- **Copy** one screenshot and paste into a chat. Multiple images use Copy next, one clipboard image at a time. “One image” combines chronological screenshots into white PNG sheets (up to six per sheet, with canvas size limits). The browser cannot put several independent images into most destination apps in one paste.
+- Download one original or a ZIP of selected files up to 300 MiB combined. Share appears only when the browser can share those actual files (up to ten).
+- Delete moves to Trash with a six-second Undo. Trash offers Restore, confirmed permanent deletion and Empty Trash. Pin excludes a file from auto-expiration; Edit and Tag change metadata.
+
+Images use client-generated JPEG thumbnails (longest side 480, quality .82, white background). Backfill runs only while visible/online and idle, for images up to 15 MiB, at most two attempts per image per session. No images are processed in the Worker.
+
+## Settings explained
+
+Storage includes active originals, thumbnails and Trash against the 900 MB soft cap. Counts can lag across isolates for 60 seconds; orphan bytes are not represented until cleaned. Auto-delete moves unpinned files to Trash after the selected upload age; Never disables it. Trash retention permanently purges after the selected period. Run cleanup now uses the same bounded job as cron and displays its counts. Security provides this-browser sign-out and Sign out everywhere.
 
 ## Security model and rotation
 
-The static HTML, JavaScript, and CSS are public and contain no personal data or credentials. All data routes live behind `/api/*`. ACCESS_KEY is a randomly generated 256-bit sign-in key; only its SHA-256 hash is stored as ACCESS_KEY_HASH. Plain SHA-256 is appropriate for this high-entropy key and avoids slow password hashing on the free Worker CPU budget. The browser never saves the key to web storage or a URL.
+The static shell is public and contains no files or credentials. Every data route is authenticated; no CORS headers are emitted. ACCESS_KEY is 256 random bits, verified with SHA-256. Cookies are HMAC-SHA256 signed, HttpOnly, SameSite=Strict, Secure and `__Host-` prefixed on HTTPS. Local HTTP uses a separate cookie. Sessions slide 30 days, renew below 15 days remaining and stop at 180 days. JavaScript never stores the session.
 
-Successful sign-in sets a server-issued HttpOnly, SameSite=Strict cookie. HTTPS uses `__Host-dump_session` with Secure and no Domain; local HTTP uses `dump_session` without Secure. Sessions slide for 30 days, renew only below 15 days remaining, and have a hard 180-day lifetime from original login. Cookie mutations require `x-dump-client: 1` and Origin/fetch-site checks; bearer requests do not use ambient cookies and skip CSRF checks. There is no CORS access.
+Cookie mutations require `x-dump-client: 1`, with Origin and fetch-site checks. Cross-site reads are rejected. Upload bearer authentication takes precedence over cookies and allows only upload/check/thumb and session scope checks. It cannot read/list/delete files or trigger maintenance. Login failures are limited to five per 15 minutes per hashed IP; bearer noise has its own limiter. No raw IPs, file names, keys, tokens or cookies are logged. Generic 500s expose no SQL, keys or stacks.
 
-UPLOAD_TOKEN_HASH verifies the separate upload-only token used by an iPhone Shortcut. In Part 2 this token can only check `/api/auth/session`; Part 3 adds upload routes. A bearer header always takes precedence over a cookie, including an invalid bearer header. A valid bearer token never reads D1 to authenticate. Invalid login attempts are limited per hashed IP to five per 15-minute window. Invalid bearer attempts have a separate ten-failure noise limiter; a valid bearer token is always accepted within its scope. No raw IPs or credentials are logged.
+Sign out clears the cookie and sends `Clear-Site-Data: "cache"` (ignored by unsupported browsers). A copied stateless cookie remains valid until expiration or epoch/secret rotation. Sign out everywhere advances a D1 epoch, immediately here and within 30 seconds in other isolates. It does not revoke the separate upload token. Rotate only the credential you mean to change:
 
-SESSION_SECRET signs cookies. Each session embeds the D1 `session_epoch`. Signing out everywhere increments this epoch; it takes effect immediately in the current isolate and within 30 seconds in other isolates due to the epoch cache. Ordinary Logout only removes this browser's cookie; a copied stateless cookie can remain valid until expiry or epoch/secret rotation.
-
-Unauthenticated requests to every non-public `/api/*` path, including nonexistent routes, return 401 rather than revealing route existence. Authenticated unknown routes and unsupported methods such as OPTIONS return the 404 envelope after the normal gate/CSRF checks. No CORS headers are sent. Public unsafe routes, including login and logout, also require the CSRF header.
-
-Rotation commands print the new credential, if applicable, plus exactly the matching `wrangler secret put` command. Save ACCESS_KEY or UPLOAD_TOKEN in your password manager before leaving your terminal:
-
-```sh
+```powershell
 node scripts/generate-secrets.mjs --only=access
 node scripts/generate-secrets.mjs --only=upload
 node scripts/generate-secrets.mjs --only=session
 ```
 
-Use `--only=access` if the sign-in key is forgotten, `--only=upload` if a Shortcut leaks, and `--only=session` to invalidate every existing login after a device is lost or stolen. Run only the command for the credential you intend to rotate, then run its printed `npx wrangler secret put ...` command and paste the value. Rotating the access key alone does not invalidate existing cookies. Update the upload token inside your Shortcut after rotating it.
+Run just the appropriate command and its displayed `wrangler secret put` command. Save the new access/upload credential; update Shortcuts after token rotation. Access-key rotation alone does not revoke cookies; session-secret rotation does. Append `--write-dev-vars` for matching local rotation; it preserves the other two values. No flag rotates all three. Without `--write-dev-vars` nothing is saved locally.
 
-For local rotation, append `--write-dev-vars`; it replaces only the selected value and preserves the other two secrets. Without `--only`, all three are generated. Plaintext access/upload keys are never written to `.dev.vars`. Never commit `.dev.vars`, `.env` files, keys, or tokens; only empty example templates belong in Git.
+JSON request limits are centralized in `worker/src/limits.ts`: login/settings 1 KiB, patch 4 KiB, duplicate check 8 KiB, bulk 16 KiB. Original bodies stream to KV; only thumbnails up to 150 KiB are buffered. All SQL values are bound; dynamic SQL contains only internal clauses. File names reach Content-Disposition via ASCII fallback and percent-encoding, and file responses have private caching, ETags, no ranges and a restrictive sandbox policy for images/thumbs.
 
-Sign out everywhere from Settings, or issue this same-origin request while signed in (for example in the browser's developer console):
+### Verify storage privacy after deploying
 
-```js
-fetch('/api/auth/logout-all', { method: 'POST', headers: { 'x-dump-client': '1' }, credentials: 'same-origin' })
+- Files live **only in the private KV namespace bound as FILES**. KV has no public URL or public-access toggle. Check the configured namespace ID in the dashboard, not its display name alone.
+- Confirm `wrangler.toml` has no `r2_buckets` or other paid-product bindings. Only authenticated `/api/files/:id/original` and `/api/files/:id/thumb` serve file bytes. No `/f/` or `/t/` handler exists on workers.dev, routes or custom domains.
+- Run `npm test`: route coverage denies anonymous access and upload-token reads on every registered private route, including maintenance. Unknown and OPTIONS methods get the 404 envelope after authentication/CSRF; anonymous unknown API paths stay 401 to hide route existence.
+- Without credentials, `curl.exe -i https://<your-worker-url>/api/files/<file-id>/original` must return 401, no-store and no file data. A request to `/f/<id>` or `/t/<id>` may return the public SPA shell, never the stored object.
+- Inspect response headers on the deployed login/gallery/viewer/trash/settings: CSP, nosniff, Referrer-Policy, frame denial, HSTS, same-origin policies, noindex and asset caching must match `web/public/_headers`. API security headers are set in middleware. Local preview checks pass; live headers require your post-deploy verification.
+
+Optional domain-only hardening (not required, no card): in Cloudflare choose your zone → Security → WAF / Security rules → Rate limiting rules → Create rule, filter URI Path equals `/api/auth/login`, and choose an available free-plan action/threshold. Dashboard labels can vary; skip if your account requests an upgrade. After a custom domain is working, set `workers_dev = false` and redeploy, or Compute → Workers & Pages → dump → Settings → Domains & Routes → disable workers.dev. Keep workers.dev enabled if it is your only URL.
+
+## Limits and costs
+
+Products: **Workers**, **Workers Static Assets** (`ASSETS`), **D1** (`DB`), **Workers KV** (`FILES`), **Cron Triggers**, **Workers Observability**. All have free-plan allowances; no payment method or paid product is configured. No R2, Queues, Images, Stream or Durable Objects binding/dependency is used. Your account/payment-method state must be checked by you in the dashboard.
+
+Cloudflare currently includes 1 GB KV storage, 100,000 reads/day, and **1,000 writes/day, 1,000 deletes/day and 1,000 list requests/day separately**, resetting at 00:00 UTC = **06:00 Dhaka**. The spec's shared mutation counter is retained as a conservative maintenance budget, not a claim that Cloudflare combines these quotas. About 400 image uploads/day is a practical estimate allowing retries/backfill (usually two writes per image), not a guaranteed allowance. The app uses a 900,000,000-byte approximate soft cap and a 25 MiB original limit, not 25 decimal MB.
+
+Workers Free includes 100,000 dynamic requests/day and a 10 ms CPU allowance per invocation; static asset requests are free/unlimited under current pricing. D1 Free includes 5 million rows read/day, 100,000 rows written/day and 5 GB total storage. Search/tag/pin/type filtering may inspect more rows than returned; date/cursor filters use indexed ULID ranges. Large metadata totals and maintenance can still consume D1/CPU quotas. Local timing is evidence for this machine, not a promise about Cloudflare CPU or remote network latency.
+
+At the soft storage cap, uploads fail with 507 STORAGE_FULL: empty Trash or remove files. KV quota failures return 429 DAILY_LIMIT; wait until 06:00 Dhaka and retry. Free-plan exhausted operations fail rather than enabling paid usage. Bulk purge deletes metadata first, so quota-failed objects are recovered by a later orphan sweep; single permanent delete reports success and also relies on that sweep. No forced deletion of active files occurs to free space.
+
+Sources: [KV pricing](https://developers.cloudflare.com/kv/platform/pricing/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+### KV operation table
+
+| Endpoint/action | KV operations |
+| --- | --- |
+| POST upload, new original | 1 write (DB failure may add 1 cleanup delete) |
+| POST upload, detected duplicate | 0 |
+| POST thumb | 1 write |
+| GET original/thumb | 1 read, or 0 on ETag 304 |
+| HEAD original/thumb | 0 |
+| List/search/check/stats/tags/settings, pin/edit | 0 |
+| Move to Trash / restore | 0 |
+| Permanent delete / bulk purge / Empty Trash | 1 delete per original, plus 1 only when a thumbnail exists |
+| Maintenance | At most 250 combined deletes/list pages; up to 4 pages |
+
+## Backup
+
+Metadata export (private: keep outside the public repository):
+
+```powershell
+npx wrangler d1 export dump-db --remote --output=backup.sql
 ```
 
-On iPhone, the installed Home Screen app has its own cookie jar, separate from Safari. Sign in once inside the installed app. The app never creates session cookies through JavaScript.
+For originals, use Select → Everything matching → Download; split selections so each ZIP is at most 300 MiB. This covers the current filters/collection and max 2,000 selected items, so back up additional ranges and Trash separately. D1 export alone does **not** back up file bytes.
+
+For a complete low-level file backup, page through KV keys and get each value (these consume live read/list quotas); keep metadata beside each file if planning restoration:
+
+```powershell
+npx wrangler kv key list --namespace-id=<namespace-id> --remote
+npx wrangler kv key get --namespace-id=<namespace-id> --remote 'f/<file-id>' > original.png
+```
+
+Use PowerShell 7.4+ for binary-preserving stdout redirection in the get command (older PowerShell can corrupt binary output). Installed Wrangler has no --output flag for kv key get. Consult installed `--help` for pagination flags before automating backups. Backups contain private data; never commit them.
+
+## Maintenance
+
+Cron `0 21 * * *` runs daily at **03:00 Dhaka**. Settings → Run cleanup now invokes the same idempotent job (one manual run per minute per isolate). It expires unpinned files, purges expired Trash, sweeps old orphan objects/repairs orphaned thumbnail metadata, and removes old login counters. Fresh objects are protected for one hour; foreign keys are ignored.
+
+Each run reserves at most 400 D1/KV operations and 250 combined KV deletes/list pages before calls. D1 batch statements count individually. Reservations may overcount when a concurrent restore avoids deletion or quota stops a delete group. Cursor advancement happens only after a complete orphan page; unfinished pages replay safely next time. A quota result stops both KV steps while D1 login cleanup continues. These are per-run caps, **not a global daily scheduler**: repeated manual runs can consume remaining daily allowance. Avoid repeated cleanup runs.
+
+Test the cron on your local server (no credentials needed for Wrangler's local-only test endpoint):
+
+```powershell
+curl.exe 'http://localhost:8787/__scheduled?cron=0+21+*+*+*'
+```
+
+Structured maintenance events contain only counts/budget flags or a fixed step name. No object keys are logged. Cron changes may take time to propagate after deployment.
+
+## Troubleshooting
+
+| Symptom | Action |
+| --- | --- |
+| Login rate limited | Wait 15 minutes; verify the plaintext key in your password manager. |
+| Local HTTP login fails after HTTPS use | Clear the stale `__Host-` cookie; use the HTTP-local cookie and matching origin. |
+| Installed iPhone app asks to log in again | Normal: its cookies are separate from Safari. |
+| Missing thumbnails after a Shortcut upload | Open the app online and leave it idle for backfill. Large originals above 15 MiB need a browser upload with a thumbnail. |
+| New file briefly 404s on another device | Wait a minute and retry; KV propagation can take 60 seconds or longer. |
+| Copy denied/unavailable | Grant clipboard permission or use Download/Share; an OS may still block image clipboard access. |
+| DAILY_LIMIT | Wait until 06:00 Dhaka; manually retry. |
+| STORAGE_FULL | Delete unwanted files and empty Trash, allowing propagation/cleanup. |
+| Shortcut 401 | Use the plaintext upload token, one space after Bearer; check rotation. |
+| Shortcut 403 | Upload tokens cannot list/read/manage data; use the upload endpoint and correct token scope. |
+| Shortcut 411 | Request Body must be File with a valid Content-Length; do not use JSON/Form/Base64. Verify on the real iPhone. |
+| Cleanup asks you to wait | Only one manual run per 60 seconds in this isolate. |
+| Offline first launch fails | Warm the shell online first; private files are never restored by the service worker. |
+
+## Post-deployment checklist (real devices)
+
+- [ ] iPhone Safari: open URL, sign in, Add to Home Screen; open the installed app and sign in again; tap +, upload three screenshots and see thumbnails.
+- [ ] Desktop Chrome: sign in, see those three screenshots, Copy one and paste into a chat.
+- [ ] Select all three, Copy and step through Copy next; switch to One image and paste the combined sheet.
+- [ ] Select all, Delete, Undo; move unwanted test files back to Trash and Empty Trash after reviewing its contents.
+- [ ] Shortcut A: share a screenshot in Photos → Dump; refresh desktop and confirm the original and eventual thumbnail.
+- [ ] Sign out everywhere; confirm another device loses access within 30 seconds.
+- [ ] Dashboard: verify the configured KV namespace/binding, no R2 bucket and no payment method.
+- [ ] On iPhone copy a screenshot inside the installed app and paste into a chat app; verify Share/Download fallback when denied.
+- [ ] Verify deployed static/API response headers and unauthenticated original returns 401.
+- [ ] Verify notch/home-indicator padding, rotations, status bar, native keyboard, permission prompts and install/login persistence.
+
+## Project layout
+
+`worker/src` contains auth, file API/storage and maintenance. `shared` contains DTO types. `web/src` contains Preact views, virtual gallery, upload/copy pipelines and PWA helpers. `web/public` contains headers, manifest, hand-written service worker and generated icons. `migrations` is the D1 schema. `scripts` contains key generation, build/security checks, icon generation, seed and smoke utilities. `worker/test` and `web/test` contain unit tests. `.github/workflows/ci.yml` performs checks without deployment/secrets. Build output, node_modules, local state and env files are ignored.
+
+## Spec history and verification
+
+[Part 1](docs/spec/part-1.md), [Part 2](docs/spec/part-2.md), [Part 3](docs/spec/part-3.md), [approved quota amendment](docs/spec/part-3-amendment.md), [Part 4](docs/spec/part-4.md), [Part 5](docs/spec/part-5.md), [Part 6](docs/spec/part-6.md), [Part 7](docs/spec/part-7.md), [Part 8](docs/spec/part-8.md). Choices and deviations are in [DECISIONS.md](DECISIONS.md). Measurements and limitations: [Part 4](docs/verification/part-4.md), [Part 5](docs/verification/part-5.md), [Part 6](docs/verification/part-6.md), [Part 7](docs/verification/part-7.md), [final Part 8 report](docs/verification/part-8.md).

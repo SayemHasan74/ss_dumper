@@ -46,3 +46,7 @@ it('maps write-byte quota errors', async () => {
   const storage = createStorage({ put: async () => { throw new Error('limit exceeded'); } } as unknown as KVNamespace);
   await expect(storage.putBytes('test',new ArrayBuffer(1),{size:1,at:1})).rejects.toBeInstanceOf(StorageQuotaError);
 });
+it('maps list quota errors for maintenance without exposing storage details', async () => {
+  const storage = createStorage({ list: async () => { throw new Error('KV list limit exceeded'); } } as unknown as KVNamespace);
+  await expect(storage.list(null, 1000)).rejects.toBeInstanceOf(StorageQuotaError);
+});

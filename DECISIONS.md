@@ -67,3 +67,22 @@
 - Keep the deferred Chromium install prompt only in memory; persist only the specified dismissal boolean and retain the existing copy-mode preference, never an upload token.
 - Account for the visual viewport's keyboard inset while search is focused so fixed upload/activity controls stay reachable; retain the sticky header and existing safe-area/dynamic-viewport layout.
 - Retain the requested default iOS status-bar style until a physical-device observation warrants a change; Windows/Chromium tests cannot establish iPhone Home Screen clipboard, status bar, permissions or Shortcut behavior.
+
+- Part 8: use the attached final part verbatim and cross-check the full downloaded eight-part Markdown; keep the explicit instruction not to deploy and provide user-run deployment steps instead.
+- Part 8: use Node 22 in CI, matching the existing >=22.12 engine and installed toolchain; the requested Node 20 cannot run these pinned dependencies.
+- Part 8: count every D1 batch statement against the total budget (more conservative than one batch call), read maintenance settings once as a separate counted call, and reserve deletes before deleting rows.
+- Part 8: maintenance counters are reserved upper bounds when concurrent restores or quota failures skip calls; preserve cursor on unfinished orphan pages so work can safely replay.
+- Part 8: recheck the retention predicate inside the atomic purge batch and use DELETE RETURNING, so concurrent restores are not followed by KV deletion.
+- Part 8: apply the approved deleteMany quotaExceeded amendment: stop purge and orphan KV steps, log maintenance_quota once, and continue independent D1 login cleanup; map KV list quota errors to StorageQuotaError too.
+- Part 8: reject invalid/nonpositive/oversized orphan thumbnail sizes rather than repairing impossible metadata; valid application thumbnails are <=150 KiB.
+- Part 8: installed Wrangler supports --path/--metadata and --command/--json as specified; on Windows execute its installed Node entrypoint with an argument array instead of invoking npx.cmd through a shell.
+- Part 8: retain the specified conservative combined KV mutation budget while documenting Cloudflare's actual separate 1,000/day write, delete and list quotas; a per-run budget does not reserve a global daily allowance.
+- Part 8: the static source audit runs alongside Vitest through npm test to verify all five JSON route parsers use centralized explicit byte limits, without adding Node type dependencies to Worker TypeScript.
+- Part 8: HTTPS smoke testing requires --prod and runs only the one-file safe subset; --prod on loopback can verify the same control path locally without spending live quota.
+- Part 8: log maintenance_fail with only a fixed step name on unexpected step failure so independent steps continue without exposing exceptions or object keys.
+- Part 8: Lighthouse exposed an invalid ARIA label on the native picker label and redundant PDF text; preserve native label activation, use real visually hidden text and explicit PDF accessible naming.
+- Part 8: measure initial virtual-grid dimensions in a layout effect, eliminating the observed first-paint column resize (Lighthouse CLS 0.209 -> 0).
+- Part 8: installed kv key get has no --output option; document binary stdout redirection requiring PowerShell 7.4+, rather than inventing a CLI flag.
+- Part 8: keep production dependency audit separate from the three reported development-tool advisories; do not blindly downgrade Wrangler to the audit-suggested older incompatible release.
+- Part 8: report the indexed date/cursor plan and limit+1 lookahead honestly; name/type/pin/tag filters can inspect more rows than returned, and cold authentication/settings caches add queries.
+- Part 8: report the stable frontend proxy and the combined app/storage runtime's measured 25 MiB-upload spike separately; these process counters cannot isolate the Worker heap or prove the no-spike requirement.

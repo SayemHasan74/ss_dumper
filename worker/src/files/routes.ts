@@ -2,6 +2,7 @@ import type { Context, Hono } from 'hono';
 import type { SettingsDTO, StatsDTO } from '../../../shared/types';
 import type { AppEnv } from '../env';
 import { HttpError, ok, parseJsonBody } from '../http';
+import { JSON_LIMITS } from '../limits';
 import { isUlid, ulid, ulidCeil, ulidFloor, ulidTime } from '../ids';
 import { AUTO_EXPIRE_DAYS, BULK_MAX_IDS, CHECK_MAX_HASHES, EMPTY_TRASH_MAX_PER_CALL, MAX_THUMB_BYTES, MAX_UPLOAD_BYTES, NOTE_MAX, PURGE_MAX_PER_CALL, SEARCH_MAX, SNIFF_BYTES, STORAGE_CAP_BYTES, TRASH_DAYS } from './config';
 import { fileDTO } from './dto';
@@ -115,7 +116,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
   });
 
   app.post('/api/upload/check', async (context) => {
-    const body = await parseJsonBody(context, 8192);
+    const body = await parseJsonBody(context, JSON_LIMITS.check);
     if (!Array.isArray(body.hashes) || body.hashes.length < 1 || body.hashes.length > CHECK_MAX_HASHES || !body.hashes.every((value): value is string => typeof value === 'string')) badRequest('hashes');
     const hashes = body.hashes.map(parseSha);
     return ok(context, { existing: await createRepo(context.env.DB).check(hashes) });
@@ -150,7 +151,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
   });
 
   app.post('/api/files/bulk', async (context) => {
-    const body = await parseJsonBody(context, 16384);
+    const body = await parseJsonBody(context, JSON_LIMITS.bulk);
     const actions: BulkAction[] = ['trash', 'restore', 'pin', 'unpin', 'tag_add', 'tag_remove', 'purge'];
     if (typeof body.action !== 'string' || !actions.includes(body.action as BulkAction)) badRequest('action');
     const action = body.action as BulkAction;
@@ -192,7 +193,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
   }
   app.patch('/api/files/:id', async (context) => {
     const id = paramId(context);
-    const body = await parseJsonBody(context, 4096);
+    const body = await parseJsonBody(context, JSON_LIMITS.patch);
     const repo = createRepo(context.env.DB);
     const row = await repo.get(id);
     if (!row) missing();
@@ -245,7 +246,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
   app.get('/api/stats', async (context) => ok(context, { ...await cache.getStats(context.env.DB) }));
   app.get('/api/settings', async (context) => ok(context, { ...await cache.getSettings(context.env.DB) }));
   app.patch('/api/settings', async (context) => {
-    const body = await parseJsonBody(context, 1024);
+    const body = await parseJsonBody(context, JSON_LIMITS.settings);
     const fields = ['autoExpireDays', 'trashDays'] as const;
     if (!fields.some((field) => body[field] !== undefined)) badRequest('settings');
     for (const field of fields) {

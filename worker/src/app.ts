@@ -10,6 +10,7 @@ import type { SettingsDTO, StatsDTO } from '../../shared/types';
 import { SETTINGS_CACHE_MS, STATS_CACHE_MS } from './files/config';
 import { createRepo, type FileRow } from './files/repo';
 import { fileRoutes, type FileCaches } from './files/routes';
+import { runMaintenance } from './maintenance';
 
 export function createApp(deps: { stores?: Stores; now?: () => number } = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -56,6 +57,15 @@ export function createApp(deps: { stores?: Stores; now?: () => number } = {}): H
   app.get('/api/health', (context) => ok(context));
   authRoutes(app, epoch);
   fileRoutes(app, fileCaches);
+  let lastMaintenance = -Infinity;
+  app.post('/api/maintenance/run', async (context) => {
+    const time = now();
+    if (time - lastMaintenance < 60000) throw new HttpError(429, 'RATE_LIMITED', 'Wait a minute before running cleanup again.', Math.ceil((60000 - (time - lastMaintenance)) / 1000));
+    lastMaintenance = time;
+    const result = await runMaintenance(context.env, time);
+    statsCache = undefined;
+    return ok(context, { ...result });
+  });
   app.notFound((context) => fail(context, new HttpError(404, 'NOT_FOUND', 'Route not found.')));
   app.onError((error, context) => fail(context, error instanceof HttpError ? error : new HttpError(500, 'INTERNAL', 'An internal error occurred.')));
   return app;

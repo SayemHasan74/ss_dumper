@@ -7,6 +7,5 @@ export const LOGIN_WINDOW_MS = 15 * 60000;
 export const BEARER_MAX_FAILS = 10;
 export const BEARER_WINDOW_MS = 15 * 60000;
 export const EPOCH_CACHE_MS = 30000;
-export const AUTH_BODY_MAX_BYTES = 1024;
 export const KEY_REGEX = /^[A-Za-z0-9_-]{43}$/;
 export const CSRF_HEADER = 'x-dump-client';

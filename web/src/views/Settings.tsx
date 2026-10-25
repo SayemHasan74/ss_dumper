@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { SettingsDTO, StatsDTO } from '../../../shared/types';
 import { authState, logout } from '../auth';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { bytes } from '../lib/format';
 import { navigate } from '../lib/router';
 import { dataVersion, settings } from '../store/files';
@@ -12,6 +12,19 @@ import { canInstall, installApp, installBusy, installed } from '../pwa/install';
 
 export function Settings() {
   const [stats, setStats] = useState<StatsDTO | null>(null), [error, setError] = useState(false), [saving, setSaving] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  async function cleanup(): Promise<void> {
+    const version = dataVersion;
+    setCleaning(true);
+    try {
+      const result = await api<{ expired: number; purged: number; orphans: number; budgetExhausted: boolean }>('/api/maintenance/run', { method: 'POST' });
+      if (version === dataVersion && authState.peek() === 'in') {
+        showToast(`Cleanup: ${result.expired} moved to Trash, ${result.purged} purged, ${result.orphans} orphans removed.${result.budgetExhausted ? ' More work remains for the next run.' : ''}`);
+        await load();
+      }
+    } catch (error) { if (version === dataVersion && authState.peek() === 'in') showToast(error instanceof ApiError ? error.message : "Couldn't run cleanup. Try again.", undefined, true); }
+    finally { setCleaning(false); }
+  }
   async function load(): Promise<void> { const version = dataVersion; setError(false); try { const stats = await api<StatsDTO>('/api/stats'), result = await api<SettingsDTO>('/api/settings'); if (version === dataVersion && authState.peek() === 'in') { setStats(stats); settings.value = result; } } catch { setError(true); } }
   useEffect(() => { void load(); }, []);
   async function save(changes: Partial<SettingsDTO>): Promise<void> {
@@ -31,6 +44,7 @@ export function Settings() {
     <section><h2>Security</h2><button class="text-button" onClick={() => void logout().catch(() => showToast("Couldn't sign out. Try again.", undefined, true))}>Sign out</button><button class="text-button danger-text" onClick={async () => { if (!await confirmAction('Sign out everywhere?')) return; try { await api('/api/auth/logout-all', { method: 'POST' }); authState.value = 'out'; } catch { showToast("Couldn't sign out everywhere. Try again.", undefined, true); } }}>Sign out everywhere</button></section>
     <section><h2>Install</h2>{installed.value ? <p>Dump is installed.</p> : <><p>On iPhone, tap Share, then Add to Home Screen. Other browsers may offer an install menu.</p>{canInstall.value && <button class="primary-button" disabled={installBusy.value} onClick={() => void installApp()}>Install app</button>}</>}<p class="form-hint">On iPhone the installed app has its own login; sign in once inside it.</p></section>
     <section><h2>iPhone Shortcut</h2><label>Upload URL<input class="upload-url" readOnly value={uploadUrl} /></label><button class="text-button" onClick={() => { if (!navigator.clipboard?.writeText) { showToast("Copy isn't available here. Select the URL to copy it.", undefined, true); return; } void navigator.clipboard.writeText(uploadUrl).then(() => showToast('Upload URL copied.')).catch(() => showToast("Couldn't copy the URL. Select it to copy.", undefined, true)); }}>Copy Upload URL</button><p class="form-hint">The upload token is not shown here and is never stored in the app.</p><details><summary>Shortcut setup checklist</summary><ol><li>Create “Dump” in Shortcuts; enable Show in Share Sheet for Images and PDFs.</li><li>Repeat with Each Shortcut Input. Convert HEIC/HEIF to JPEG; set UploadFile to the converted image or original.</li><li>Get UploadFile’s name and URL Encode it as EncName. Optionally hash UploadFile with SHA256 as Sha.</li><li>Get Contents of URL: POST to the Upload URL above. Headers: Authorization = Bearer followed by one space and your upload token; X-File-Name = EncName; optional X-Content-Sha256 = Sha; Content-Type = application/octet-stream.</li><li>Set Request Body to File, UploadFile. Check the result’s ok; show error → message if false. Notify “Sent to Dump” after the repeat.</li><li>For “Dump latest screenshots”, start with Find Photos: Screenshots album, latest first, limit 5, then the same repeat.</li></ol></details></section>
+    <section><h2>Maintenance</h2><p>Cleanup runs daily at 03:00 Dhaka time.</p><button class="text-button" disabled={cleaning} aria-busy={cleaning} onClick={() => void cleanup()}>{cleaning ? 'Running cleanup…' : 'Run cleanup now'}</button></section>
     <section><h2>About</h2><p>Dump {__APP_VERSION__} · {__BUILD_DATE__}</p></section>
   </main></>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { galleryItems as items, loadMore, loadMoreError, nextCursor, status } from '../store/files';
 import { gridMetrics } from '../store/ui';
 import { openViewer, route } from '../lib/router';
@@ -20,7 +20,7 @@ export function VirtualGrid() {
   const skeletonCount = loading ? 30 : nextCursor.value ? layout.cols : 0;
   const totalRows = Math.ceil((loading ? 30 : count) / layout.cols) + (!loading && nextCursor.value ? 1 : 0);
   const rows = useRef(totalRows); rows.current = totalRows;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
     function update(): void {
@@ -54,6 +54,7 @@ export function VirtualGrid() {
     window.addEventListener('resize', measure);
     window.addEventListener('dump:layout', measure);
     measure();
+    update();
     return () => { observer.disconnect(); cancelAnimationFrame(frame.current); window.removeEventListener('scroll', schedule); window.removeEventListener('resize', measure); window.removeEventListener('dump:layout', measure); };
   }, []);
   useEffect(() => { window.dispatchEvent(new Event('dump:layout')); }, [totalRows, count, loading]);
