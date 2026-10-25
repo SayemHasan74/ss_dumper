@@ -106,6 +106,8 @@ Follow [the complete iPhone Shortcut guide](docs/ios-shortcut.md) for Share Shee
 
 ## Daily use
 
+The gallery shows **Total photos** across all saved images, including those not yet loaded by scrolling. It excludes PDFs, pending uploads and Trash, and refreshes after uploads or file actions finish. Counts use the existing cached stats endpoint and may lag changes made on other devices by up to 60 seconds.
+
 - Tap **+** and choose up to 100 supported files, at most 25 MiB each. Desktop also supports drop and paste outside editors. iOS includes its normal extra picker tap.
 - Queued images show placeholders until their small thumbnails are prepared; full-size originals are never used as gallery/tray previews. Preparation has two slots and uploads have three (two on slow/data-saving connections); retry, cancel and progress are in the upload tray. Offline queues wait; closing the tab loses unfinished files. Keep the app open while uploading.
 - Filter by name, date, file type, pin or tag. Scrolling uses a virtualized grid; refresh merges new files while preserving older pages. The new-files pill lets you choose when to insert items while scrolled down.

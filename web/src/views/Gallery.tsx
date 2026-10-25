@@ -1,9 +1,11 @@
 import type { ComponentType } from 'preact';
+import type { StatsDTO } from '../../../shared/types';
 import { useEffect, useState } from 'preact/hooks';
 import { clearCellCache } from '../components/Cell';
 import { FilterBar } from '../components/FilterBar';
 import { Header } from '../components/Header';
 import { Icon } from '../components/Icon';
+import { api } from '../lib/api';
 import { Toast } from '../components/Toast';
 import { VirtualGrid } from '../components/VirtualGrid';
 import { closeViewer, route } from '../lib/router';
@@ -13,10 +15,10 @@ import { showPending } from '../store/files';
 import { Fab } from '../components/Fab';
 import { UploadTray } from '../components/UploadTray';
 import { DropOverlay } from '../components/DropOverlay';
-import { enqueue } from '../upload/queue';
+import { busy, enqueue } from '../upload/queue';
 import '../upload/backfill';
 import { clearSelection, selectedFiles, selectMode, selectMatching } from '../store/selection';
-import { bulkAction } from '../store/actions';
+import { actionBusy, bulkAction } from '../store/actions';
 import { SelectionBar } from '../components/SelectionBar';
 import { CopyQueue } from '../components/CopyQueue';
 import { copyQueue, closeCopy, startCopy } from '../lib/clipboard';
@@ -28,12 +30,19 @@ import { dismissInstallHint, showInstallHint } from '../pwa/install';
 let viewerModule: Promise<typeof import('../components/Viewer')> | undefined;
 const loadViewer = () => viewerModule ??= import('../components/Viewer').catch((error: unknown) => { viewerModule = undefined; throw error; });
 export function Gallery() {
+  const [totalPhotos, setTotalPhotos] = useState<number | null>(null);
   const [Viewer, setViewer] = useState<ComponentType | null>(null);
   const [viewerError, setViewerError] = useState(false);
   const [Auxiliary, setAuxiliary] = useState<ComponentType | null>(null), [auxError, setAuxError] = useState(false), [auxRetry, setAuxRetry] = useState(0);
   const view = route.value.view;
   const id = route.value.view === 'viewer' ? route.value.id : undefined;
   const ready = firstPageLoaded.value;
+  useEffect(() => {
+    if (view !== 'gallery' || busy.value || actionBusy.value || !online.value) return;
+    let active = true;
+    void api<StatsDTO>('/api/stats').then((stats) => { if (active) setTotalPhotos(stats.photoCount); }).catch(() => {});
+    return () => { active = false; };
+  }, [view, busy.value, actionBusy.value, online.value, items.value.length]);
   function importViewer(): void { setViewerError(false); void loadViewer().then((module) => setViewer(() => module.Viewer)).catch(() => setViewerError(true)); }
   useEffect(() => { if (id) importViewer(); }, [id]);
   useEffect(() => {
@@ -83,7 +92,7 @@ export function Gallery() {
       {!trashMode.value && <FilterBar />}
       <main class="gallery page-width" id="gallery">
         {!trashMode.value && showInstallHint.value && <aside class="install-hint"><p>Install Dump: tap Share, then Add to Home Screen.</p><button class="icon-button" aria-label="Dismiss install hint" onClick={dismissInstallHint}><Icon name="close" /></button></aside>}
-        <div class="gallery-summary"><span>{status.value === 'loading' && !items.value.length ? 'Loading files…' : `${items.value.length}${nextCursor.value ? '+' : ''} ${items.value.length === 1 ? 'file' : 'files'}`}</span>{!online.value && <span>Offline</span>}</div>
+        <div class="gallery-summary"><span>{!trashMode.value && <>Total photos: {totalPhotos ?? '—'} · </>}{status.value === 'loading' && !items.value.length ? 'Loading files…' : `${items.value.length}${nextCursor.value ? '+' : ''} ${items.value.length === 1 ? 'file' : 'files'}`}</span>{!online.value && <span>Offline</span>}</div>
         {status.value === 'error' && !items.value.length ? <section class="empty-state" role="status"><Icon name="refresh" size={32} /><h2>{errorMessage.value}</h2><button class="primary-button" onClick={() => void loadFirstPage()}>Retry</button></section> : empty ? <section class="empty-state"><Icon name={hasFilters.value ? 'search' : 'image'} size={36} /><h2>{trashMode.value ? 'Trash is empty' : hasFilters.value ? 'No matches' : 'Nothing here yet'}</h2>{!trashMode.value && (hasFilters.value ? <button class="text-button" onClick={() => { clearFilters(); void loadFirstPage(); }}>Clear filters</button> : <p>Tap + to add screenshots.</p>)}</section> : <VirtualGrid />}
         {loadMoreError.value && <div class="load-more-error" role="status"><span>Couldn't load more</span><button class="text-button" onClick={() => void loadMore(true)}>Retry</button></div>}
       </main>

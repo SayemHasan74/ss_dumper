@@ -32,6 +32,7 @@ export function createApp(deps: { stores?: Stores; now?: () => number } = {}): H
       const adjust = (row: FileRow, sign: number) => {
         const trash = row.deleted_at !== null;
         statsCache!.value[trash ? 'trashCount' : 'count'] += sign;
+        if (!trash && row.mime.startsWith('image/')) statsCache!.value.photoCount += sign;
         statsCache!.value[trash ? 'trashBytes' : 'bytes'] += sign * (row.size + row.thumb_size);
       };
       before.forEach((row) => adjust(row, -1));

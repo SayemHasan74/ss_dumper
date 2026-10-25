@@ -109,13 +109,13 @@ export function createRepo(db: D1Database) {
       ]);
     },
     async stats(): Promise<StatsDTO> {
-      const result = await db.batch<{ count: number; bytes: number }>([
-        db.prepare('SELECT COUNT(*) AS count, COALESCE(SUM(size + thumb_size), 0) AS bytes FROM files WHERE deleted_at IS NULL'),
+      const result = await db.batch<{ count: number; photoCount: number; bytes: number }>([
+        db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN mime LIKE 'image/%' THEN 1 ELSE 0 END), 0) AS photoCount, COALESCE(SUM(size + thumb_size), 0) AS bytes FROM files WHERE deleted_at IS NULL"),
         db.prepare('SELECT COUNT(*) AS count, COALESCE(SUM(size + thumb_size), 0) AS bytes FROM files WHERE deleted_at IS NOT NULL'),
       ]);
       const active = result[0].results[0];
       const trash = result[1].results[0];
-      return { count: active.count, bytes: active.bytes, trashCount: trash.count, trashBytes: trash.bytes, capBytes: STORAGE_CAP_BYTES };
+      return { count: active.count, photoCount: active.photoCount, bytes: active.bytes, trashCount: trash.count, trashBytes: trash.bytes, capBytes: STORAGE_CAP_BYTES };
     },
   };
 }

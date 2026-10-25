@@ -44,3 +44,11 @@ These phone behaviors require physical-device testing; the HTTPS smoke test does
 - The first remote migration check hit transient Cloudflare error 7403. A sequential retry succeeded, with no migrations needed; no schema, quotas, retention settings or user files were changed.
 - Deployed version `d32be7bc-94e4-4892-ae3f-d7911e20fd72`; HTTPS production smoke passed, including cleanup of only its own fixture.
 - Owner retry: reload the app once before selecting files, then retry the 66-photo selection while keeping the app open. Byte-identical files already stored are skipped by existing duplicate detection. Physical iPhone verification remains pending.
+
+## Total photo count, 25 October 2026
+
+- Added Total photos above the gallery: all active images, excluding PDFs, pending uploads and Trash, independent of pagination and filters.
+- Extended the existing cached stats query and mutation adjustments; no new KV operations or database migrations. Fetches after uploads/actions settle rather than polling or fetching per upload.
+- SQLite regression checks zero photos, 70 images beyond one gallery page, PDF/Trash exclusion and moving images into/out of Trash.
+- All 97 tests and typecheck/build budgets passed. Deployed version `d19dc80f-0cd3-4e65-b6fa-a64d80b03c32`.
+- Production safe smoke, photo-count response validation and current frontend bundle check passed.
