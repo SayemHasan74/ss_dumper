@@ -6,6 +6,7 @@ import { filters, showToast, updateFilters } from '../store/ui';
 import { Icon, type IconName } from './Icon';
 import { selectMode } from '../store/selection';
 import { navigate } from '../lib/router';
+import { pendingCount } from '../upload/queue';
 
 export function Header({ notes = false }: { notes?: boolean }) {
   const [searching, setSearching] = useState(!!filters.value.q);
@@ -47,7 +48,7 @@ export function Header({ notes = false }: { notes?: boolean }) {
     { label: searching ? 'Close search' : 'Search files', icon: 'search', run: () => searching ? closeSearch() : setSearching(true) },
     { label: 'Refresh files', icon: 'refresh', run: () => { void refresh(); }, busy: status.value === 'loading' || status.value === 'loadingMore' },
   ];
-  const entries = [{ label: 'Trash', run: () => navigate('/trash') }, { label: 'Settings', run: () => navigate('/settings') }, { label: 'Sign out', run: async () => { try { await logout(); } catch { showToast("Couldn't sign out. Try again.", undefined, true); } } }];
+  const entries = [{ label: pendingCount.value ? `Uploads (${pendingCount.value} pending)` : 'Uploads', run: () => navigate('/uploads') }, { label: 'Trash', run: () => navigate('/trash') }, { label: 'Settings', run: () => navigate('/settings') }, { label: 'Sign out', run: async () => { try { await logout(); } catch { showToast("Couldn't sign out. Try again.", undefined, true); } } }];
   return <header ref={header} class="app-header"><div class="header-row page-width">
     <h1 class="app-title">Dump</h1>
     <div class="header-actions">

@@ -20,8 +20,10 @@ export async function login(key: string): Promise<void> {
   await api('/api/auth/login', { method: 'POST', json: { key } });
   authState.value = 'in';
 }
-export async function logout(): Promise<void> {
-  await api('/api/auth/logout', { method: 'POST' });
+export async function logout(everywhere = false): Promise<void> {
+  const { beforeSignOut } = await import('./upload/queue');
+  if (!await beforeSignOut()) return;
+  await api(everywhere ? '/api/auth/logout-all' : '/api/auth/logout', { method: 'POST' });
   authState.value = 'out';
 }
 window.addEventListener('online', () => { if (authState.peek() === 'unknown' && bootError.peek()) void bootAuth(); });

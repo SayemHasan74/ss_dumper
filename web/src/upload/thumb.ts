@@ -3,6 +3,7 @@ export async function createThumbnail(blob: Blob): Promise<Thumbnail | null> {
   let bitmap: ImageBitmap | undefined;
   let image: HTMLImageElement | undefined;
   let url = '';
+  let canvas: HTMLCanvasElement | OffscreenCanvas | undefined;
   try {
     let source: CanvasImageSource;
     let width: number, height: number;
@@ -18,15 +19,16 @@ export async function createThumbnail(blob: Blob): Promise<Thumbnail | null> {
     if (!width || !height) return null;
     const scale = Math.min(1, 480 / Math.max(width, height));
     const w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
-    const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : Object.assign(document.createElement('canvas'), { width: w, height: h });
     const context = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
     if (!context) return null;
     context.fillStyle = '#ffffff'; context.fillRect(0, 0, w, h);
     context.drawImage(source, 0, 0, w, h);
-    const jpeg = canvas instanceof HTMLCanvasElement
-      ? await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82))
-      : await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
+    const target = canvas;
+    const jpeg = target instanceof HTMLCanvasElement
+      ? await new Promise<Blob | null>((resolve) => target.toBlob(resolve, 'image/jpeg', 0.82))
+      : await target.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
     return jpeg ? { blob: jpeg, width, height } : null;
   } catch { return null; }
-  finally { bitmap?.close(); if (image) { image.onload = image.onerror = null; image.removeAttribute('src'); } if (url) URL.revokeObjectURL(url); }
+  finally { if (canvas) { canvas.width = canvas.height = 1; } bitmap?.close(); if (image) { image.onload = image.onerror = null; image.removeAttribute('src'); } if (url) URL.revokeObjectURL(url); }
 }

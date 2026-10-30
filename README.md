@@ -98,7 +98,7 @@ Open the same HTTPS address on your phone, Mac or Windows browser. Sign in once 
 
 Open the address in Safari → Share → Add to Home Screen. Open the new Dump icon and **sign in once inside the installed app**; iPhone uses a separate login from Safari. Desktop browsers may offer Install app in Settings or their own install menu.
 
-The first visit installs the service worker; reload online under its control to warm the public shell before an offline launch. Offline startup shows anonymous skeletons and “You're offline”, without restoring private files. Reconnection checks authentication again. Changed service-worker bytes produce an Update ready → Reload toast; app-only hashed-asset changes load on the next navigation. Finish uploads before reloading: queued files live only in memory.
+The first visit installs the service worker; reload online under its control to warm the public shell before an offline launch. Offline startup shows anonymous skeletons and “You're offline”, without restoring private files. Reconnection checks authentication again. Changed service-worker bytes produce an Update ready → Reload toast; app-only hashed-asset changes load on the next navigation. Before reloading, check Uploads: only originals marked **Saved on this device** have verified local retention.
 
 ## Share-sheet upload
 
@@ -109,7 +109,7 @@ Follow [the complete iPhone Shortcut guide](docs/ios-shortcut.md) for Share Shee
 The gallery shows **Total photos** across all saved images, including those not yet loaded by scrolling. It excludes PDFs, pending uploads and Trash, and refreshes after uploads or file actions finish. Counts use the existing cached stats endpoint and may lag changes made on other devices by up to 60 seconds.
 
 - Tap **+** and choose up to 100 supported files, at most 25 MiB each. Desktop also supports drop and paste outside editors. iOS includes its normal extra picker tap.
-- Queued images show placeholders until their small thumbnails are prepared; full-size originals are never used as gallery/tray previews. Preparation has two slots and uploads have three (two on slow/data-saving connections); retry, cancel and progress are in the upload tray. Offline queues wait; closing the tab loses unfinished files. Keep the app open while uploading.
+- Queued images use placeholders or small thumbnails, never full-size original previews. Uploads has Pause, Resume, Retry, Cancel and retained-file history. One shared preparation slot and one touch/slow/data-saving upload chain limit phone memory use; desktop uses up to three chains. Keep the app visible for transfers; retained files can wait until reopening.
 - Filter by name, date, file type, pin or tag. Scrolling uses a virtualized grid; refresh merges new files while preserving older pages. The new-files pill lets you choose when to insert items while scrolled down.
 - Open a file for its original. Use arrows/swipes, zoom/pan or open/download PDFs. Back/Escape closes the viewer.
 - Tap **Select**, long-press a cell, or use desktop Ctrl/Cmd-click and Shift-click. Select loaded items or Everything matching (up to 2,000).
@@ -118,6 +118,22 @@ The gallery shows **Total photos** across all saved images, including those not 
 - Delete moves to Trash with a six-second Undo. Trash offers Restore, confirmed permanent deletion and Empty Trash. Pin excludes a file from auto-expiration; Edit and Tag change metadata.
 
 Images use client-generated JPEG thumbnails (longest side 480, quality .82, white background). Backfill runs only while visible/online and idle, for images up to 15 MiB, at most two attempts per image per session. No images are processed in the Worker.
+
+## Recoverable uploads
+
+Open **Uploads** from the header menu or activity indicator. Pending uploads belong to this browser on this device; completed files still appear across devices. Originals are saved serially in IndexedDB (`dump-uploads`), separate from metadata and small thumbnails. **Saved on this device** appears only after the write transaction commits and a follow-up read verifies the blob size. While **Saving** or **Not saved locally**, keep the page open. Local-storage failures offer a retry or explicit upload-without-recovery choice; that session-only choice cannot survive closing the page.
+
+After reload or browser restart, sign in and choose **Resume**. Restoration never starts transfers automatically. A hidden page returning within the same session can continue previously runnable work after checking authentication; manually paused jobs stay paused. Interrupted originals restart from byte zero after a SHA-256 lookup, rather than continuing from a byte offset. A confirmed original is never retransmitted for thumbnail recovery or because someone later trashed/deleted the server file. Server deduplication remains the final guard against requests that overlap or whose responses were lost; exactly one network transfer/KV write is not guaranteed.
+
+Selections over 100 files open a virtualized review containing the whole returned selection. Deselect, remove, select the first 100, **Queue selected** (up to 100), or explicitly **Queue all in groups of 100**. Files left in review remain available, including after reload if retained. Selections still inside the OS Photos picker have not reached the app and cannot be recovered by it.
+
+Pause keeps local bytes. Cancel asks before deleting unfinished local copies and never deletes server files; a request already accepted can still appear in the gallery. Failed work stays available for Retry. Missing originals require **Choose file again**, with a saved-hash check or an explicit identity-unproven replacement confirmation. Completed/cancelled history lasts 30 days unless cleared; unfinished work has no automatic local expiration. The local-storage section shows known retained bytes and browser persistence status. Estimates and persistence permission do not guarantee writes or prevent device failure.
+
+Pending originals are **not application-encrypted** and may remain after closing the app. Someone with access to this device/browser profile may access website data; hiding Uploads behind sign-in does not encrypt it. Explicit sign-out offers **Keep pending uploads on this device**, **Delete this device’s pending uploads**, or Cancel. Automatic session expiry retains pending data. Sign out everywhere revokes browser sessions, but its chosen local cleanup applies only to this browser, not other devices. Credentials are never stored in the upload database. `Clear-Site-Data` remains cache-only.
+
+Browser eviction, cleared website data, private browsing, low storage, device failure, another hostname/profile/browser, or a separate Safari/Home Screen app storage context can remove or hide the queue. If the entire database disappears, names/counts cannot be reconstructed. Recovery is local persistence, not guaranteed background execution. No Background Sync or service-worker uploads are used. Daily server limits wait until 00:00 UTC / 06:00 Dhaka; server-cap failures wait for space and an explicit Resume/stat check. Two tabs coordinate with Web Locks and an expiring, fenced IndexedDB lease.
+
+See [recovery verification and the real-phone checklist](docs/verification/resumable-uploads.md). The browser integration script uses synthetic files and a fresh temporary local Worker/D1/KV dataset; it never deploys or reads personal server files. Build first, then run `node scripts/test-upload-recovery.mjs` with an already available Playwright runtime. If it is outside this project, set `DUMP_BROWSER_RUNTIME` to its absolute `package.json` (or another file usable by `createRequire`); optionally set `DUMP_BROWSER` to the installed Chromium/Edge executable. No dependency is added. Ports 8799 and 9241 must be free. Artifacts are written to the printed temporary directory; generated local credentials are removed on normal test completion.
 
 ## Notes across devices
 
