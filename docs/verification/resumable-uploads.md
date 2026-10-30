@@ -67,4 +67,12 @@ No new runtime/testing dependency, backend table, resource binding, paid service
 - Browser-process restart, 137-file selected/all workflows, one touch chain, bounded desktop chains, native IndexedDB transaction failures, ownership/takeover, CSP, Notes/image clipboard, Trash and service-worker offline checks passed as described above. Light/dark 375-pixel screenshots were inspected. No physical iPhone test is claimed.
 - Staged secret/build-asset scan and private environment-history check passed; `.dev.vars`, selected files, browser profiles, local state, build output and credentials are excluded from the commit. Final diff whitespace check passed.
 
-Deployment results are appended after the authorized release and live verification.
+## Authorized deployment
+
+Feature commit: `e6451d311e7be98d9c223a1ca13511b0fa52acde`, pushed to `codex/part-1` at the owner's GitHub repository. The prior restore tag still dereferences to `565450ebd30a47d26205e00869f7ace61cba465e`.
+
+`npm run deploy` passed on 31 October 2026 under the owner's existing deployment authorization. No remote migrations were pending. The existing `FILES`, `DB` and asset bindings were reused with no paid service or credential change. Live URL: [Dump](https://dump.sayemhasan74.workers.dev). Worker version: `108d7b33-5f53-42b3-8083-47ddc2a30d65`.
+
+Live HTTPS checks verified the current HTML/hashed recovery chunks, CSP and anonymous API denial. A fresh authenticated Chromium context retained one unique synthetic PNG in native IndexedDB, paused it before forwarding its original, reloaded, and waited for explicit Resume. Resume produced one accepted original POST and one thumbnail POST; another reload produced neither again. The file metadata was no-store and matched the original size. The test then trashed and permanently deleted only its own fixture. Existing files/notes, settings and credentials were not changed; background original fetching was blocked during the test to avoid touching personal files.
+
+Reload the app once to load the new frontend before selecting new files. This feature cannot recover File objects already lost by the previous memory-only version. Physical iPhone acceptance remains outstanding as listed above.
