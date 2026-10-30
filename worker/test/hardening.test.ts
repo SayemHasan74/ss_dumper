@@ -13,7 +13,7 @@ it('clears the browser cache on both sign-out routes', async () => {
   }
 });
 it('defines all JSON limits in one place', () => {
-  expect(JSON_LIMITS).toEqual({ login: 1024, settings: 1024, patch: 4096, check: 8192, bulk: 16384 });
+  expect(JSON_LIMITS).toEqual({ login: 1024, settings: 1024, patch: 4096, check: 8192, bulk: 16384, noteMeta: 1024, noteChunk: 65536 });
 });
 it('hides thrown database or storage details in generic 500 responses', async () => {
   const f = await fixture();

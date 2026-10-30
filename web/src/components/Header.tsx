@@ -7,7 +7,7 @@ import { Icon, type IconName } from './Icon';
 import { selectMode } from '../store/selection';
 import { navigate } from '../lib/router';
 
-export function Header() {
+export function Header({ notes = false }: { notes?: boolean }) {
   const [searching, setSearching] = useState(!!filters.value.q);
   const [draft, setDraft] = useState(filters.value.q);
   const [menu, setMenu] = useState(false);
@@ -51,12 +51,12 @@ export function Header() {
   return <header ref={header} class="app-header"><div class="header-row page-width">
     <h1 class="app-title">Dump</h1>
     <div class="header-actions">
-      {actions.map((action) => <button class="icon-button" key={action.label} aria-label={action.label} title={action.label} onClick={action.run} aria-busy={action.busy}><Icon name={action.icon} class={action.busy ? 'spin' : ''} /></button>)}
+      {!notes && actions.map((action) => <button class="icon-button" key={action.label} aria-label={action.label} title={action.label} onClick={action.run} aria-busy={action.busy}><Icon name={action.icon} class={action.busy ? 'spin' : ''} /></button>)}
       <div ref={menuRoot} class="menu-root"><button ref={more} class="icon-button" aria-label="More options" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Icon name="more" /></button>
         {menu && <div class="menu" role="menu" aria-label="More options">{entries.map((entry) => <button key={entry.label} role="menuitem" onClick={() => { setMenu(false); void entry.run(); }}>{entry.label}</button>)}</div>}
       </div>
     </div>
-  </div>{searching && <div class="search-row page-width"><Icon name="search" /><input ref={input} type="search" aria-label="Search files" placeholder="Search files" value={draft} maxLength={60} onKeyDown={(event) => { if (event.key === 'Escape') closeSearch(); }} onInput={(event) => {
+  </div>{!notes && searching && <div class="search-row page-width"><Icon name="search" /><input ref={input} type="search" aria-label="Search files" placeholder="Search files" value={draft} maxLength={60} onKeyDown={(event) => { if (event.key === 'Escape') closeSearch(); }} onInput={(event) => {
     const value = event.currentTarget.value; setDraft(value); clearTimeout(debounce.current);
     debounce.current = setTimeout(() => { updateFilters({ q: value.trim() }); void loadFirstPage(); window.scrollTo({ top: 0 }); }, 250);
   }} /><button class="icon-button" aria-label="Clear and close search" onClick={closeSearch}><Icon name="close" size={18} /></button></div>}</header>;

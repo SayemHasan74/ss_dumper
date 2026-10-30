@@ -11,6 +11,7 @@ import { SETTINGS_CACHE_MS, STATS_CACHE_MS } from './files/config';
 import { createRepo, type FileRow } from './files/repo';
 import { fileRoutes, type FileCaches } from './files/routes';
 import { runMaintenance } from './maintenance';
+import { noteRoutes } from './notes';
 
 export function createApp(deps: { stores?: Stores; now?: () => number } = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -58,6 +59,7 @@ export function createApp(deps: { stores?: Stores; now?: () => number } = {}): H
   app.get('/api/health', (context) => ok(context));
   authRoutes(app, epoch);
   fileRoutes(app, fileCaches);
+  noteRoutes(app);
   let lastMaintenance = -Infinity;
   app.post('/api/maintenance/run', async (context) => {
     const time = now();

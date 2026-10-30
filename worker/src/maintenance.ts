@@ -125,6 +125,9 @@ export async function runMaintenance(env: Env, now: number): Promise<Maintenance
       if (!cursor) break;
     }
   });
+  await step('note_staging', async () => {
+    if (budget.take(1)) await env.DB.prepare('DELETE FROM note_chunks WHERE (note_id, version, position) IN (SELECT c.note_id, c.version, c.position FROM note_chunks c JOIN notes n ON n.id = c.note_id WHERE c.staged_at < ?1 AND c.version != n.version ORDER BY c.staged_at LIMIT 200)').bind(now - DAY).run();
+  });
   await step('login_cleanup', async () => {
     if (budget.take(1)) await env.DB.prepare('DELETE FROM login_attempts WHERE window_start < ?1').bind(now - DAY).run();
   });

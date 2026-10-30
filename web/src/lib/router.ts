@@ -5,6 +5,7 @@ const table: { pattern: RegExp; resolve: (match: RegExpMatchArray) => Route }[] 
   { pattern: /^\/$/, resolve: () => ({ view: 'gallery' }) },
   { pattern: /^\/trash$/, resolve: () => ({ view: 'trash' }) },
   { pattern: /^\/settings$/, resolve: () => ({ view: 'settings' }) },
+  { pattern: /^\/notes$/, resolve: () => ({ view: 'notes' }) },
   { pattern: /^\/v\/([0-9A-HJKMNP-TV-Z]{26})$/, resolve: (match) => ({ view: 'viewer', id: match[1] }) },
 ];
 export const route = signal<Route>({ view: 'gallery' });

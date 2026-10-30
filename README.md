@@ -10,7 +10,7 @@ Deployed URL: https://dump.sayemhasan74.workers.dev. Frontend and API are served
 
 1. One Cloudflare Worker serves the Preact app and authenticated Hono API.
 2. Workers Static Assets hosts the public, data-free HTML/JS/CSS shell.
-3. D1 (`DB`) stores metadata, tags, settings and authentication counters.
+3. D1 (`DB`) stores metadata, tags, settings, private note blocks and authentication counters.
 4. Private Workers KV (`FILES`) stores originals and client-generated thumbnails.
 5. A server-issued HttpOnly cookie provides long-lived browser sign-in; a separate token permits uploads only.
 6. Cron runs bounded maintenance; the service worker caches only the public shell and static assets.
@@ -118,6 +118,18 @@ The gallery shows **Total photos** across all saved images, including those not 
 - Delete moves to Trash with a six-second Undo. Trash offers Restore, confirmed permanent deletion and Empty Trash. Pin excludes a file from auto-expiration; Edit and Tag change metadata.
 
 Images use client-generated JPEG thumbnails (longest side 480, quality .82, white background). Backfill runs only while visible/online and idle, for images up to 15 MiB, at most two attempts per image per session. No images are processed in the Worker.
+
+## Notes across devices
+
+Open **Notes**, immediately beside PDFs, or go directly to [your private Notes screen](https://dump.sayemhasan74.workers.dev/#/notes). Tap **+ Add block**, then type or paste plain text. Changes save after a short pause; another visible Notes screen picks them up within about four seconds. Cutting or clearing text saves an empty block and clears it on your other devices. Use the Copy button or normal text selection; Delete permanently removes a block after confirmation.
+
+There is no editor character limit or per-block application text cap. Text is split into small D1 rows and bounded requests, including blocks larger than D1's individual 2 MB row limit. Notes share the existing database's storage and free-plan read/write/request quotas; browser memory and platform capacity remain finite. Notes use no KV operations. They are separate from files, are not included in file storage/photo counts, and are never auto-expired or moved to file Trash. Your D1 metadata backup includes notes; file ZIP downloads do not.
+
+Only full browser sessions can access `/api/notes`; upload tokens cannot. All responses are no-store, the service worker bypasses them, note text is rendered literally, and text never goes to logs or localStorage. Autosave is debounced by 600 ms. A four-second visible-screen poll normally reads just the single revision counter; unchanged text is not downloaded again. Polling stops when hidden, refreshes on focus/reconnect, and long blocks load near the viewport. No new service, dependency or payment method is needed.
+
+If two devices edit the same version, the app preserves the local draft and offers **Discard draft and load latest** or **Keep my text as a new block**. Offline edits remain only in the current tab and resume on reconnect. Keep that tab open until Saved; closing/reloading it can lose unsynced changes. A supported browser warns before leaving with pending changes. A lost save response can be recognized on retry or the next sync, without applying the old text over a newer revision. Sign-out clears drafts from memory.
+
+Deployments apply `migrations/0002_notes.sql` using the existing `npm run deploy` sequence. It only adds Notes tables/triggers. Maintenance removes at most 200 abandoned staging chunks older than a day per run, never the current saved version. Local evidence and live deployment details are in [Notes verification](docs/verification/notes.md).
 
 ## Settings explained
 

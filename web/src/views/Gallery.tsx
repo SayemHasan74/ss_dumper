@@ -51,7 +51,7 @@ export function Gallery() {
     if (view === 'gallery' || view === 'trash') { const wanted = view === 'trash'; if (trashMode.peek() !== wanted) { trashMode.value = wanted; void loadFirstPage(); } }
     window.scrollTo({ top: 0, behavior: 'instant' });
     let active = true; setAuxError(false); setAuxiliary(null);
-    const module = view === 'trash' ? import('./Trash').then((module) => module.Trash) : view === 'settings' ? import('./Settings').then((module) => module.Settings) : null;
+    const module = view === 'trash' ? import('./Trash').then((module) => module.Trash) : view === 'settings' ? import('./Settings').then((module) => module.Settings) : view === 'notes' ? import('./Notes').then((module) => module.Notes) : null;
     if (module) void module.then((component) => { if (active) setAuxiliary(() => component); }).catch(() => { if (active) setAuxError(true); });
     return () => { active = false; };
   }, [view, auxRetry]);
@@ -75,7 +75,7 @@ export function Gallery() {
     const key = (event: KeyboardEvent) => {
       if (dialogCount.peek() || (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
       if (event.key === 'Escape' && copyQueue.peek()) { event.preventDefault(); event.stopImmediatePropagation(); closeCopy(); return; }
-      if (route.peek().view === 'viewer' || route.peek().view === 'settings') return;
+      if (['viewer', 'settings', 'notes'].includes(route.peek().view)) return;
       if (event.key === 'Escape') { clearSelection(); return; }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); void selectMatching('loaded'); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && selectedFiles.peek().length) { event.preventDefault(); startCopy(selectedFiles.peek()); }
@@ -87,7 +87,7 @@ export function Gallery() {
   const empty = !items.value.length && status.value !== 'loading' && status.value !== 'error';
   return <>
     <div inert={!!id} aria-hidden={id ? true : undefined}>
-      {view === 'settings' ? (Auxiliary ? <Auxiliary /> : <p role="status">{auxError ? <button class="text-button" onClick={() => setAuxRetry((value) => value + 1)}>Retry settings</button> : 'Loading…'}</p>) : <>
+      {view === 'notes' ? <><Header notes /><FilterBar />{Auxiliary ? <Auxiliary /> : <p role="status">{auxError ? <button class="text-button" onClick={() => setAuxRetry((value) => value + 1)}>Retry notes</button> : 'Loading notes…'}</p>}</> : view === 'settings' ? (Auxiliary ? <Auxiliary /> : <p role="status">{auxError ? <button class="text-button" onClick={() => setAuxRetry((value) => value + 1)}>Retry settings</button> : 'Loading…'}</p>) : <>
       {selectMode.value ? <SelectionBar /> : trashMode.value ? (Auxiliary ? <Auxiliary /> : <header class="app-header"><p>{auxError ? <button class="text-button" onClick={() => setAuxRetry((value) => value + 1)}>Retry Trash</button> : 'Loading Trash…'}</p></header>) : <Header />}
       {!trashMode.value && <FilterBar />}
       <main class="gallery page-width" id="gallery">
