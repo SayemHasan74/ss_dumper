@@ -33,3 +33,5 @@ Physical iPhone Safari/Home Screen keyboard, selection and clipboard behavior re
 ## Deployment
 
 Live deployment verification is recorded in [the deployment log](deployment.md). Only the additive Notes migration and existing Worker/assets are required; credentials, files and existing metadata are preserved. Live smoke uses only its own temporary note block and removes it afterwards.
+
+Live deployment on 30 October 2026: version `a3076fad-f822-4053-a2e3-9d12bef91cd9` at https://dump.sayemhasan74.workers.dev/#/notes. The additive migration applied successfully; existing bindings/secrets were reused. HTTPS current-bundle/CSP checks, anonymous denial, CSRF enforcement, create/stage/commit/private Unicode read, cut-to-empty and permanent deletion all passed using only one temporary test block. Cleanup was verified by its subsequent 404. No existing note or file content was read/changed by this live smoke test, and no credentials were rotated or persisted. Code is in commit `95a478b`; the full deployment record is linked above.

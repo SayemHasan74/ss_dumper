@@ -52,3 +52,16 @@ These phone behaviors require physical-device testing; the HTTPS smoke test does
 - SQLite regression checks zero photos, 70 images beyond one gallery page, PDF/Trash exclusion and moving images into/out of Trash.
 - All 97 tests and typecheck/build budgets passed. Deployed version `d19dc80f-0cd3-4e65-b6fa-a64d80b03c32`.
 - Production safe smoke, photo-count response validation and current frontend bundle check passed.
+
+## Cross-device Notes, 30 October 2026
+
+- Added the private Notes section beside PDFs, with plain-text blocks, autosave, cross-device updates, cut-to-clear, copy and confirmed deletion.
+- Applied only additive migration `0002_notes.sql` to the existing `dump-db` database. Existing file rows, KV data and all three Worker secrets were preserved; no new resource/binding/dependency/payment method was introduced.
+- Deployment code commit: `95a478b`; deployed Worker version: `a3076fad-f822-4053-a2e3-9d12bef91cd9`.
+- Live URL: https://dump.sayemhasan74.workers.dev/#/notes. Reload an already-open app to load the new bundle.
+- Final checks: typecheck, 107 tests in 22 files, production build, budget check and production dependency audit all passed. Initial JS gzip 33,152 / 40,960 bytes; CSS 8,029 / 10,240. Notes loads lazily at about 3.7 KiB gzip.
+- Local two-session browser checks passed for Unicode editing, native Cut clearing another device, large chunked text, offline conflict draft preservation, safe lost-response retry, deletion sync, hidden-tab polling pause, mobile/dark/landscape layout, zero CSP violations and zero browser errors. A 2.1-million-plus-code-unit block also round-tripped through route/SQLite tests.
+- Live HTTPS verification passed for current HTML/Notes bundle, CSP, anonymous denial, CSRF enforcement, create/stage/commit/private Unicode read, empty-text publication, and permanent deletion of only the temporary test block. Verified that fixture was then 404.
+- Live checks used a five-minute test session signed in memory with the existing local session secret and the remote session epoch. No access/upload credential or cookie was printed, saved or rotated; no existing note/file content was read or changed by the live smoke test.
+- Notes use D1 only, with no application per-block character cap; normal free database/request/browser limits still apply. Saved Notes are not subject to file expiry/Trash. Offline drafts remain in the current tab until saved; simultaneous same-block edits preserve drafts for explicit resolution.
+- Owner physical iPhone/Home Screen keyboard and clipboard checks remain necessary. Full implementation/verification details: [Notes report](notes.md).
