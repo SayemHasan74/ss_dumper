@@ -7,6 +7,7 @@ export function fileDTO(row: FileRow, settings: SettingsDTO): FileDTO {
     id: row.id, name: row.name, mime: row.mime, size: row.size, width: row.width, height: row.height,
     thumbSize: row.thumb_size, note: row.note, pinned: row.pinned === 1, tags: tags.sort(),
     createdAt: row.created_at, deletedAt: row.deleted_at,
+    ...(row.mime.startsWith('image/') ? { photoDate: { at: row.photo_date ?? row.created_at, source: row.photo_date_source ?? 'upload', timezoneAssumed: row.photo_timezone_assumed === 1 } } : {}),
     expiresAt: row.pinned || row.deleted_at !== null || !settings.autoExpireDays ? null : row.created_at + settings.autoExpireDays * 86400000,
   };
 }

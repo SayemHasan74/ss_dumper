@@ -1,18 +1,20 @@
-import type { SettingsDTO, StatsDTO } from '../../../shared/types';
+import type { PhotoDate, SettingsDTO, StatsDTO } from '../../../shared/types';
 import { STORAGE_CAP_BYTES } from './config';
 
 export interface FileRow {
   id: string; name: string; mime: string; size: number;
   width: number | null; height: number | null; thumb_size: number; note: string; pinned: number;
   created_at: number; deleted_at: number | null; tags: string;
+  photo_date?: number | null; photo_date_source?: PhotoDate['source']; photo_timezone_assumed?: number;
 }
 export interface ListFilter {
   limit: number; trash: boolean; cursor?: string; since?: string; until?: string;
   type?: 'image' | 'pdf' | 'file'; tag?: string; q?: string; pinned?: boolean;
+  sort?: 'photo'; photoCursor?: { at: number; id: string };
 }
 export interface FilePatch { name?: string; note?: string; pinned?: boolean; tags?: string[] }
 export type BulkAction = 'trash' | 'restore' | 'pin' | 'unpin' | 'tag_add' | 'tag_remove' | 'purge';
-const columns = `f.id, f.name, f.mime, f.size, f.width, f.height, f.thumb_size, f.note, f.pinned, f.created_at, f.deleted_at,
+const columns = `f.id, f.name, f.mime, f.size, f.width, f.height, f.thumb_size, f.note, f.pinned, f.created_at, f.deleted_at, f.photo_date, f.photo_date_source, f.photo_timezone_assumed,
  (SELECT json_group_array(t.tag) FROM file_tags t WHERE t.file_id = f.id) AS tags`;
 const byIds = 'id IN (SELECT value FROM json_each(?1))';
 
@@ -33,13 +35,14 @@ export function createRepo(db: D1Database) {
       return Object.fromEntries(result.results.map((row) => [row.sha256, row.id]));
     },
     async insert(row: FileRow, sha: string | null): Promise<void> {
-      await db.prepare('INSERT INTO files (id, name, mime, size, sha256, width, height, thumb_size, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8)')
-        .bind(row.id, row.name, row.mime, row.size, sha, row.width, row.height, row.created_at).run();
+      await db.prepare('INSERT INTO files (id, name, mime, size, sha256, width, height, thumb_size, created_at, photo_date, photo_date_source, photo_timezone_assumed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, ?11)')
+        .bind(row.id, row.name, row.mime, row.size, sha, row.width, row.height, row.created_at, row.photo_date ?? null, row.photo_date_source ?? 'upload', row.photo_timezone_assumed ?? 0).run();
     },
     async list(filter: ListFilter): Promise<FileRow[]> {
       const where = [filter.trash ? 'f.deleted_at IS NOT NULL' : 'f.deleted_at IS NULL'];
       const values: (string | number)[] = [];
       if (filter.cursor !== undefined) { where.push('f.id < ?'); values.push(filter.cursor); }
+      if (filter.photoCursor) { where.push('(COALESCE(f.photo_date, f.created_at), f.id) < (?, ?)'); values.push(filter.photoCursor.at, filter.photoCursor.id); }
       if (filter.since !== undefined) { where.push('f.id >= ?'); values.push(filter.since); }
       if (filter.until !== undefined) { where.push('f.id <= ?'); values.push(filter.until); }
       if (filter.type === 'image') where.push("f.mime LIKE 'image/%'");
@@ -48,7 +51,8 @@ export function createRepo(db: D1Database) {
       if (filter.pinned) where.push('f.pinned = 1');
       if (filter.tag !== undefined) { where.push('f.id IN (SELECT file_id FROM file_tags WHERE tag = ?)'); values.push(filter.tag); }
       if (filter.q !== undefined) { where.push("f.name LIKE ? ESCAPE '\\'"); values.push(filter.q); }
-      const result = await db.prepare(`SELECT ${columns} FROM files f WHERE ${where.join(' AND ')} ORDER BY f.id DESC LIMIT ?`).bind(...values, filter.limit + 1).all<FileRow>();
+      const order = filter.sort === 'photo' ? 'COALESCE(f.photo_date, f.created_at) DESC, f.id DESC' : 'f.id DESC';
+      const result = await db.prepare(`SELECT ${columns} FROM files f WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ?`).bind(...values, filter.limit + 1).all<FileRow>();
       return result.results;
     },
     async patch(id: string, patch: FilePatch): Promise<void> {

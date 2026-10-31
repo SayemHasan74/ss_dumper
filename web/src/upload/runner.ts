@@ -8,6 +8,7 @@ import { sha256Hex } from './hash';
 import { createThumbnail } from './thumb';
 import { fileMime, uploadName } from './names';
 import { prepare } from './work';
+import { readPhotoDate } from './photo-date';
 import { recoverRequests, UploadError, xhr } from './xhr';
 
 const owner = crypto.randomUUID(), files = new Map<string, File>(), durable = new Set<string>();
@@ -26,7 +27,7 @@ function notify(): void { channel?.postMessage({ owner }); }
 function publish(): void {
   if (!signedIn()) return;
   if (!records.peek().some(job => !finished(job)) && /^(Found |Waiting for connection|Daily limit reached|Server storage is)/.test(queueMessage.peek())) queueMessage.value = '';
-  uploads.value = records.peek().filter(job => job.submitted).map(job => ({ id: job.id, localId: job.id, name: job.name, mime: job.mime, size: job.size, width: job.width, height: job.height, thumbSize: job.server?.thumbSize ?? 0, note: '', pinned: false, tags: [], createdAt: job.created, deletedAt: null, expiresAt: null, previewUrl: '', progress: progress.peek()[job.id] ?? 0, status: job.phase === 'completed' ? job.duplicate ? 'duplicate' : 'done' : job.intent === 'cancel' ? 'cancelled' : job.blocker === 'retry' || job.blocker === 'unsupported' || job.blocker === 'local' || job.blocker === 'missing' ? 'failed' : job.intent === 'pause' || job.blocker ? 'waiting' : job.phase === 'original' || job.phase === 'thumbnail' ? 'uploading' : 'queued', message: jobLabel(job) } satisfies LocalFile));
+  uploads.value = records.peek().filter(job => job.submitted).map(job => ({ id: job.id, localId: job.id, name: job.name, mime: job.mime, size: job.size, width: job.width, height: job.height, thumbSize: job.server?.thumbSize ?? 0, note: '', pinned: false, tags: [], createdAt: job.created, photoDate: job.photoDate ?? (job.mime.startsWith('image/') && job.modified > 0 ? {at:job.modified,source:'modified',timezoneAssumed:false} : undefined), deletedAt: null, expiresAt: null, previewUrl: '', progress: progress.peek()[job.id] ?? 0, status: job.phase === 'completed' ? job.duplicate ? 'duplicate' : 'done' : job.intent === 'cancel' ? 'cancelled' : job.blocker === 'retry' || job.blocker === 'unsupported' || job.blocker === 'local' || job.blocker === 'missing' ? 'failed' : job.intent === 'pause' || job.blocker ? 'waiting' : job.phase === 'original' || job.phase === 'thumbnail' ? 'uploading' : 'queued', message: jobLabel(job) } satisfies LocalFile));
   localItems.value = uploads.peek().filter(item => !['done', 'duplicate', 'cancelled'].includes(item.status) && current(item.id)?.submitted);
   busy.value = active.size > 0;
   updateWake();
@@ -233,16 +234,21 @@ async function runJob(id: string, token: Attempt): Promise<void> {
       assertAttempt(id, token);
       if (checked.existing[job.hash]) {
         const metadata = await remote<{ file: FileDTO }>(`/api/files/${checked.existing[job.hash]}`, token);
-        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: metadata.file, duplicate: true, phase: 'thumbnail', thumbnail: !metadata.file.mime.startsWith('image/') ? 'none' : metadata.file.thumbSize ? 'confirmed' : job.thumbnail }, token);
+        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: metadata.file, photoDate: metadata.file.photoDate ?? job.photoDate, duplicate: true, phase: 'thumbnail', thumbnail: !metadata.file.mime.startsWith('image/') ? 'none' : metadata.file.thumbSize ? 'confirmed' : job.thumbnail }, token);
       } else {
         const blob = original ?? files.get(id) ?? await db.getBlob(id);
         if (!blob || blob.size !== job.size) throw new db.LocalStoreError('missing', 'Original file needed.');
         const file = blob instanceof File ? blob : new File([blob], job.originalName, { type: job.mime, lastModified: job.modified });
+        if (job.mime.startsWith('image/') && !job.photoDate) {
+          const photoDate = await prepare(async () => { assertAttempt(id, token); return readPhotoDate(file, job.modified, job.created); });
+          job = await checkpoint(job, { photoDate }, token);
+        }
         if (job.thumbnail === 'needed') job = await makeThumb(job, file, token);
+        progress.value = { ...progress.peek(), [id]:0 };
         job = await checkpoint(job, { phase: 'original', uncertain: true }, token);
-        const response = await remote<{ file: FileDTO; duplicate: boolean }>('/api/upload', token, file, { 'Content-Type':job.mime || 'application/octet-stream', 'X-File-Name':encodeURIComponent(job.name), 'X-Content-Sha256':job.hash, ...(job.width && job.height ? { 'X-Width':String(job.width), 'X-Height':String(job.height) } : {}) }, value => { if (active.get(id) === token && !token.controller.signal.aborted) { progress.value = { ...progress.peek(), [id]:value }; } });
+        const response = await remote<{ file: FileDTO; duplicate: boolean }>('/api/upload', token, file, { 'Content-Type':job.mime || 'application/octet-stream', 'X-File-Name':encodeURIComponent(job.name), 'X-Content-Sha256':job.hash, ...(job.photoDate && job.photoDate.source !== 'upload' ? { 'X-Photo-Date':String(job.photoDate.at), 'X-Photo-Date-Source':job.photoDate.source, 'X-Photo-Timezone-Assumed':job.photoDate.timezoneAssumed?'1':'0' } : {}), ...(job.width && job.height ? { 'X-Width':String(job.width), 'X-Height':String(job.height) } : {}) }, value => { if (active.get(id) === token && !token.controller.signal.aborted) { progress.value = { ...progress.peek(), [id]:value }; } });
         if (!response.file?.id || typeof response.file.size !== 'number') throw new UploadError(0,'INTERNAL');
-        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: response.file, duplicate: response.duplicate, phase: 'thumbnail', thumbnail: !response.file.mime.startsWith('image/') ? 'none' : response.file.thumbSize ? 'confirmed' : job.thumbnail, attempt: 0 }, token);
+        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: response.file, photoDate: response.file.photoDate ?? job.photoDate, duplicate: response.duplicate, phase: 'thumbnail', thumbnail: !response.file.mime.startsWith('image/') ? 'none' : response.file.thumbSize ? 'confirmed' : job.thumbnail, attempt: 0 }, token);
       }
     }
     if (job.thumbnail === 'stored' && job.retention === 'retained') job = await checkpoint(job, { retention:'released' }, token, { dropOriginal:true });

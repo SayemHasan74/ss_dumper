@@ -31,6 +31,15 @@ export function makePng(width, height, seed) {
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0))]);
 }
 
+// Small synthetic capture-date fixture. Original image bytes remain otherwise unchanged.
+export function withCaptureDate(png, date, offset = '+00:00') {
+  const tiff = Buffer.alloc(256); tiff.write('II'); tiff.writeUInt16LE(42,2);tiff.writeUInt32LE(8,4);
+  tiff.writeUInt16LE(1,8);tiff.writeUInt16LE(0x8769,10);tiff.writeUInt16LE(4,12);tiff.writeUInt32LE(1,14);tiff.writeUInt32LE(26,18);
+  tiff.writeUInt16LE(offset?2:1,26);let next=56;
+  [date,offset].forEach((text,i)=>{if(!text)return;const at=28+i*12;tiff.writeUInt16LE(i?0x9011:0x9003,at);tiff.writeUInt16LE(2,at+2);tiff.writeUInt32LE(text.length+1,at+4);tiff.writeUInt32LE(next,at+8);tiff.write(text,next);next+=text.length+1;});
+  return Buffer.concat([png.subarray(0,33),chunk('eXIf',tiff.subarray(0,next)),png.subarray(33)]);
+}
+
 export function createRaster(width, height) {
   return { width, height, data: new Uint8Array(width * height * 4) };
 }

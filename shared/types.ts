@@ -1,8 +1,10 @@
+export interface PhotoDate { at: number; source: 'capture' | 'modified' | 'upload'; timezoneAssumed: boolean }
 export interface FileDTO {
   id: string; name: string; mime: string; size: number;
   width: number | null; height: number | null;
   thumbSize: number; note: string; pinned: boolean; tags: string[];
   createdAt: number; deletedAt: number | null; expiresAt: number | null;
+  photoDate?: PhotoDate;
 }
 export interface StatsDTO { count: number; photoCount: number; bytes: number; trashCount: number; trashBytes: number; capBytes: number }
 export interface SettingsDTO { autoExpireDays: number; trashDays: number }

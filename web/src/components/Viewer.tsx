@@ -1,3 +1,4 @@
+import { photoDateLabel } from '../../../shared/photo-date';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { FileDTO } from '../../../shared/types';
 import { authState } from '../auth';
@@ -177,7 +178,7 @@ export function Viewer() {
         </> : <div class={file.mime==='application/pdf'?'pdf-card':'pdf-card generic-file-card'}><Icon name={file.mime==='application/pdf'?'file-pdf':'file'} size={44} /><h2>{file.name}</h2><p>{bytes(file.size)}</p><div>{file.mime==='application/pdf'&&<a class="viewer-button" href={`/api/files/${file.id}/original`} target="_blank" rel="noopener">Open</a>}<a class="viewer-button secondary" href={`/api/files/${file.id}/original?download=1`}>Download</a></div>{file.mime!=='application/pdf'&&<TextPreview file={file}/>}</div>}
         {index >= 0 && <><button class="viewer-chevron previous icon-button" aria-label="Previous file" disabled={index === 0} onClick={() => move(-1)}><Icon name="chevron-left" size={28} /></button><button class="viewer-chevron next icon-button" aria-label="Next file" disabled={index === list.length - 1} onClick={() => move(1)}><Icon name="chevron-right" size={28} /></button></>}
       </div>
-      {file && <footer class="viewer-info"><p>{bytes(file.size)}{file.width && file.height ? ` · ${file.width} × ${file.height}` : ''}<span class="info-divider">·</span><time dateTime={new Date(file.createdAt).toISOString()}>{dateTime(file.createdAt)}</time></p>{file.pinned && !!settings.value?.autoExpireDays ? <p>Pinned — never expires</p> : file.expiresAt && file.expiresAt - Date.now() <= 14 * 86400000 ? <p>Expires in {Math.max(0, Math.ceil((file.expiresAt - Date.now()) / 86400000))} days</p> : null}{file.tags.length > 0 && <div class="viewer-tags">{file.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}{file.note && <p class="viewer-note">{file.note}</p>}</footer>}
+      {file && <footer class="viewer-info"><p>{bytes(file.size)}{file.width && file.height ? ` · ${file.width} × ${file.height}` : ''}<span class="info-divider">·</span><time dateTime={new Date(file.createdAt).toISOString()}>{dateTime(file.createdAt)}</time> · uploaded</p>{file.mime.startsWith('image/')&&<p>{photoDateLabel(file.photoDate)}: {dateTime(file.photoDate?.at ?? file.createdAt)}</p>}{file.pinned && !!settings.value?.autoExpireDays ? <p>Pinned — never expires</p> : file.expiresAt && file.expiresAt - Date.now() <= 14 * 86400000 ? <p>Expires in {Math.max(0, Math.ceil((file.expiresAt - Date.now()) / 86400000))} days</p> : null}{file.tags.length > 0 && <div class="viewer-tags">{file.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}{file.note && <p class="viewer-note">{file.note}</p>}</footer>}
     </div>
   </div>;
 }

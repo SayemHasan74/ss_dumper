@@ -6,6 +6,7 @@ import { JSON_LIMITS } from '../limits';
 import { isUlid, ulid, ulidCeil, ulidFloor, ulidTime } from '../ids';
 import { AUTO_EXPIRE_DAYS, BULK_MAX_IDS, CHECK_MAX_HASHES, EMPTY_TRASH_MAX_PER_CALL, MAX_THUMB_BYTES, MAX_UPLOAD_BYTES, NOTE_MAX, PURGE_MAX_PER_CALL, SEARCH_MAX, SNIFF_BYTES, STORAGE_CAP_BYTES, TRASH_DAYS } from './config';
 import { fileDTO } from './dto';
+import { parsePhotoDate, parsePhotoCursor, photoCursor } from './photo-date';
 import { createRepo, type BulkAction, type FilePatch, type FileRepo, type FileRow, type ListFilter } from './repo';
 import { serveFile } from './serve';
 import { jpegMagicOk, sniffMime } from './sniff';
@@ -52,10 +53,17 @@ function listFilter(context: Context<AppEnv>): ListFilter {
   if (query.trash !== undefined && query.trash !== '1') badRequest('trash');
   if (query.pinned !== undefined && query.pinned !== '1') badRequest('pinned');
   if (query.pinned === '1') filter.pinned = true;
-  if (query.cursor !== undefined) { if (!isUlid(query.cursor)) badRequest('cursor'); filter.cursor = query.cursor; }
   if (query.type !== undefined) {
     if (query.type !== 'image' && query.type !== 'pdf' && query.type !== 'file') badRequest('type');
     filter.type = query.type;
+  }
+  if (query.sort !== undefined) {
+    if (query.sort !== 'photo' || filter.trash || (filter.type && filter.type !== 'image')) badRequest('sort');
+    filter.sort = 'photo';
+  }
+  if (query.cursor !== undefined) {
+    if (filter.sort === 'photo') filter.photoCursor = parsePhotoCursor(query.cursor);
+    else { if (!isUlid(query.cursor)) badRequest('cursor'); filter.cursor = query.cursor; }
   }
   if (query.tag !== undefined) filter.tag = normalizeTag(query.tag);
   if (query.q !== undefined) {
@@ -79,6 +87,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
     const shaHeader = context.req.header('X-Content-Sha256');
     const sha = shaHeader === undefined ? null : parseSha(shaHeader);
     const dims = dimensions(context);
+    const photo = parsePhotoDate(context.req.raw.headers, context.get('now')());
     const body = context.req.raw.body;
     if (!body) throw new HttpError(400, 'EMPTY_FILE', 'File is empty.');
     const repo = createRepo(context.env.DB);
@@ -100,6 +109,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
     const name = context.req.header('X-File-Name');
     if (name !== undefined && name.length <= 600) { try { decoded = decodeURIComponent(name); } catch { decoded = 'file'; } }
     const row: FileRow = { id, name: sanitizeName(decoded, mime), mime, size, ...(mime.startsWith('image/') ? dims : {width:null,height:null}), thumb_size: 0, note: '', pinned: 0, created_at: ulidTime(id), deleted_at: null, tags: '[]' };
+    if (mime.startsWith('image/') && photo && photo.source !== 'upload') { row.photo_date = photo.at; row.photo_date_source = photo.source; row.photo_timezone_assumed = photo.timezoneAssumed ? 1 : 0; }
     try { await repo.insert(row, sha); }
     catch (error) {
       await storage.deleteMany([key]);
@@ -146,7 +156,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
     const more = rows.length > filter.limit;
     if (more) rows.pop();
     const settings = await cache.getSettings(context.env.DB);
-    return ok(context, { files: rows.map((row) => fileDTO(row, settings)), nextCursor: more ? rows.at(-1)!.id : null });
+    return ok(context, { files: rows.map((row) => fileDTO(row, settings)), nextCursor: more ? filter.sort === 'photo' ? photoCursor(rows.at(-1)!) : rows.at(-1)!.id : null });
   });
 
   app.post('/api/files/bulk', async (context) => {

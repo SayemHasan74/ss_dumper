@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { effectiveDate, photoDateLabel } from '../../../shared/photo-date';
 import type { FileDTO } from '../../../shared/types';
 import { bytes } from '../lib/format';
 import { openViewer } from '../lib/router';
@@ -45,5 +46,5 @@ export function Cell({ file, size }: { file: FileDTO | LocalFile; size: number }
     {!local && <span class={selectMode.value ? 'cell-select visible' : 'cell-select'} role="checkbox" aria-checked={selected} aria-label={`Select ${file.name}`}><Icon name="check" size={16} /></span>}
     {file.deletedAt && <span class="cell-trash-left">{Math.max(0, Math.ceil((file.deletedAt + (settings.value?.trashDays ?? 7) * 86400000 - Date.now()) / 86400000))} d left</span>}
     {local && <span class={local.status === 'failed' ? 'cell-upload upload-error' : 'cell-upload'}><span>{local.message}</span><progress aria-label="Upload progress" value={local.progress} max={1} /></span>}
-  </button><p class="file-card-name" title={file.name}>{file.name}</p><div class="file-card-info"><span>{bytes(file.size)}</span><time dateTime={new Date(file.createdAt).toISOString()}>{fileDate.format(file.createdAt)}</time></div></div>;
+  </button><p class="file-card-name" title={file.name}>{file.name}</p><div class="file-card-info"><span>{bytes(file.size)}</span><time title={image ? photoDateLabel(file.photoDate) : 'Upload date'} dateTime={new Date(effectiveDate(file)).toISOString()}>{fileDate.format(effectiveDate(file))}</time></div></div>;
 }

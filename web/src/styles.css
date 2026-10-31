@@ -136,25 +136,12 @@ button:focus-visible, a:focus-visible, [tabindex="0"]:focus-visible { outline: 2
 .upload-fab { display: flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 17px; background: var(--accent); color: var(--bg); box-shadow: 0 4px 16px #0003; cursor: pointer; touch-action: manipulation; }
 .upload-fab:active { opacity: .8; }
 .upload-input:focus-visible + .upload-fab { outline: 2px solid var(--accent); outline-offset: 4px; }
-.upload-tray { width: 100%; max-height: calc(100dvh - 104px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 6px 28px #0002; overflow: hidden; }
-.tray-summary { display: flex; min-height: 48px; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; text-align: left; font-size: 14px; font-weight: 600; }
-.tray-progress { display: block; width: 100%; height: 3px; accent-color: var(--accent); }
-.tray-message { font-size: 13px; padding: 12px 16px 0; color: var(--danger); }
-.tray-summary, .tray-progress, .tray-message, .tray-actions { flex-shrink: 0; }
-.tray-list { min-height: 0; max-height: 40dvh; overflow: auto; overscroll-behavior: contain; list-style: none; padding: 0 12px; }
-.tray-list li { display: flex; align-items: center; gap: 10px; padding-block: 8px; border-bottom: 1px solid var(--border); }
-.tray-preview { display: flex; width: 36px; height: 36px; flex-shrink: 0; object-fit: cover; align-items: center; justify-content: center; border-radius: 4px; background: var(--bg); color: var(--muted); }
-.tray-item-info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
-.tray-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
-.tray-item-info progress { width: 100%; height: 3px; accent-color: var(--accent); }
-.tray-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; padding: 0 4px; font-size: 13px; }
 .upload-error { color: var(--danger); }
 .cell-upload { position: absolute; inset: auto 0 0; padding: 7px; background: #111418d9; color: #fff; font-size: 11px; text-align: left; }
 .cell-upload.upload-error { color: #ffb4a9; }
 .cell-upload span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .cell-upload progress { display: block; width: 100%; height: 3px; margin-top: 4px; accent-color: var(--accent); }
 .drop-overlay { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: color-mix(in srgb, var(--bg) 94%, transparent); color: var(--accent); border: 3px dashed var(--accent); font-weight: 600; pointer-events: none; }
-body:has(.upload-tray) .gallery { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
 .selection-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; }
 .selection-row > span { white-space: nowrap; font-size: 14px; }
 .select-menu { min-width: 0; max-width: 180px; }
@@ -337,3 +324,25 @@ body:has(.selection-header.phone) .gallery { padding-bottom: calc(96px + env(saf
   .workspace-subtitle { font-size: 11px; }
   .file-cell, .skeleton { border-radius: 9px; }
 }
+
+.upload-dock { position: fixed; z-index: 65; right: env(safe-area-inset-right, 0px); bottom: calc(88px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px)); border: 1px solid var(--border); border-radius: 14px 0 0 14px; background: var(--surface); box-shadow: 0 6px 28px #0003; overflow: hidden; }
+.upload-dock.expanded { bottom: calc(88px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px) + var(--dock-activity, 0px)); display: flex; flex-direction: column; width: min(360px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right))); max-height: calc(100dvh - var(--workspace-topbar-height) - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--keyboard-inset, 0px) - var(--dock-activity, 0px)); }
+.dock-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 12px 0 16px; flex-shrink: 0; }
+.dock-header h2 { font-size: 16px; }
+.dock-header p, .dock-footer, .dock-message { font-size: 12px; color: var(--muted); }
+.dock-header p { margin-top: 4px; }
+.dock-controls { display: flex; gap: 8px; padding: 8px 12px; flex-shrink: 0; }
+.dock-controls button { flex: 1; min-height: 44px; }
+.dock-message { padding: 8px 16px; max-height: 88px; overflow-y: auto; flex-shrink: 0; }
+.dock-list.upload-list { flex: 0 1 auto; min-height: 0; max-height: none; margin: 0; border-block: 1px solid var(--border); }
+.dock-list .upload-row { padding: 10px; }
+.dock-list .upload-row-heading { gap: 8px; }
+.dock-list .upload-row-actions { gap: 4px; }
+.dock-list .upload-row-actions button { min-width: 44px; min-height: 44px; }
+.dock-list .upload-row-error { font-size: 12px; }
+.dock-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 0 16px; flex-shrink: 0; }
+.upload-dock.collapsed { display: flex; flex-direction: column; width: 64px; }
+.dock-tab { display: flex; align-items: center; gap: 10px; writing-mode: vertical-rl; padding: 16px 10px; min-width: 44px; min-height: 120px; font-size: 14px; }
+.dock-tab span { writing-mode: horizontal-tb; font-variant-numeric: tabular-nums; }
+.dock-toggle { border-top: 1px solid var(--border); min-height: 48px; min-width: 44px; font-size: 12px; color: var(--accent); }
+body:has(.copy-queue) .upload-dock.collapsed { bottom: auto; top: calc(var(--workspace-topbar-height) + 16px + env(safe-area-inset-top)); }

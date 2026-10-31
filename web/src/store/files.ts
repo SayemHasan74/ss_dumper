@@ -3,6 +3,7 @@ import type { FileDTO, SettingsDTO } from '../../../shared/types';
 import { authState } from '../auth';
 import { api } from '../lib/api';
 import { filters, gridMetrics, online, pendingNew, resetUI, showToast } from './ui';
+import { photoOrder } from '../../../shared/photo-date';
 import { matchesFileType } from '../lib/file-type';
 
 interface Page { files: FileDTO[]; nextCursor: string | null }
@@ -20,7 +21,9 @@ export const firstPageLoaded = signal(false);
 export type UploadStatus = 'queued' | 'hashing' | 'checking' | 'preparing' | 'uploading' | 'waiting' | 'failed' | 'done' | 'duplicate' | 'cancelled';
 export interface LocalFile extends FileDTO { localId: string; status: UploadStatus; progress: number; previewUrl: string; message: string }
 export const localItems = signal<LocalFile[]>([]);
-export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...(trashMode.value ? [] : localItems.value.filter(file=>matchesFileType(file.mime,filters.value.type))), ...items.value]);
+export const usesPhotoOrder = (): boolean => !trashMode.value && ['all', 'image'].includes(filters.value.type);
+export const galleryOrder = (a: FileDTO, b: FileDTO): number => usesPhotoOrder() ? photoOrder(a, b) : b.id.localeCompare(a.id);
+export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => { const files = [...(trashMode.value ? [] : localItems.value.filter(file=>matchesFileType(file.mime,filters.value.type))), ...items.value]; return usesPhotoOrder() ? files.sort(photoOrder) : files; });
 export const previewById = signal<Record<string, string>>({});
 export function clearPreviews(): void {
   for (const url of Object.values(previewById.peek())) URL.revokeObjectURL(url);
@@ -33,9 +36,9 @@ export function acceptUpload(file: FileDTO, preview = ''): void {
     previewById.value = { ...previewById.peek(), [file.id]: preview };
   }
   if (trashMode.peek() || !matchesFileType(file.mime,filters.peek().type)) return;
-  items.value = [file, ...items.peek().filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
+  items.value = [file, ...items.peek().filter((item) => item.id !== file.id)].sort(galleryOrder);
   if (pending) {
-    pending.files = [file, ...pending.files.filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
+    pending.files = [file, ...pending.files.filter((item) => item.id !== file.id)].sort(galleryOrder);
     pendingNew.value = pending.files.filter((item) => !items.peek().some((known) => known.id === item.id)).length;
   }
 }
@@ -49,6 +52,7 @@ let token = 0;
 let authVersion = 0;
 let lastRefresh = -Infinity;
 let pending: Page | null = null;
+let loadedBoundary: FileDTO | undefined;
 
 export function listQuery(limit: number, cursor?: string): string {
   const f = filters.peek();
@@ -56,6 +60,7 @@ export function listQuery(limit: number, cursor?: string): string {
   if (trashMode.peek()) { search.set('trash', '1'); if (cursor) search.set('cursor', cursor); return `/api/files?${search}`; }
   if (cursor) search.set('cursor', cursor);
   if (f.type !== 'all') search.set('type', f.type);
+  if (usesPhotoOrder()) search.set('sort', 'photo');
   if (f.pinned) search.set('pinned', '1');
   if (f.tag) search.set('tag', f.tag);
   if (f.q) search.set('q', f.q);
@@ -72,14 +77,15 @@ export async function loadFirstPage(): Promise<void> {
   controller?.abort();
   controller = new AbortController();
   const request = ++token;
-  pending = null;
+  pending = null; loadedBoundary = undefined;
   batch(() => { items.value = []; nextCursor.value = null; pendingNew.value = 0; status.value = 'loading'; errorMessage.value = ''; loadMoreError.value = ''; firstPageLoaded.value = false; });
   try {
     const page = await api<Page>(listQuery(48), { signal: controller.signal });
     if (request !== token) return;
+    loadedBoundary = page.files.at(-1);
     const fetched = new Set(page.files.map((file) => file.id));
     const acceptedWhileLoading = items.peek().filter((file) => !fetched.has(file.id));
-    batch(() => { items.value = [...acceptedWhileLoading, ...page.files].sort((a, b) => b.id.localeCompare(a.id)); nextCursor.value = page.nextCursor; status.value = 'idle'; firstPageLoaded.value = true; });
+    batch(() => { items.value = [...acceptedWhileLoading, ...page.files].sort(galleryOrder); nextCursor.value = page.nextCursor; status.value = 'idle'; firstPageLoaded.value = true; });
   } catch {
     if (request === token) { errorMessage.value = message(); status.value = 'error'; }
   }
@@ -94,18 +100,21 @@ export async function loadMore(retry = false): Promise<void> {
   try {
     const page = await api<Page>(listQuery(60, nextCursor.peek()!), { signal: controller.signal });
     if (request !== token) return;
+    loadedBoundary = page.files.at(-1) ?? loadedBoundary;
     const known = new Set(items.peek().map((file) => file.id));
-    batch(() => { items.value = [...items.peek(), ...page.files.filter((file) => !known.has(file.id))]; nextCursor.value = page.nextCursor; status.value = 'idle'; });
+    batch(() => { items.value = [...items.peek(), ...page.files.filter((file) => !known.has(file.id))].sort(galleryOrder); nextCursor.value = page.nextCursor; status.value = 'idle'; });
   } catch {
     if (request === token) { loadMoreError.value = "Couldn't load more"; status.value = 'idle'; }
   }
 }
 function applyMerge(page: Page): void {
-  const minimum = page.files.at(-1)?.id;
-  const older = minimum ? items.peek().filter((file) => file.id < minimum) : [];
+  const minimum = page.files.at(-1);
+  const ids = new Set(page.files.map(file => file.id));
+  const older = minimum && page.nextCursor ? items.peek().filter(file => !ids.has(file.id) && galleryOrder(file, minimum) > 0) : [];
+  if (usesPhotoOrder()) loadedBoundary = minimum;
   batch(() => {
-    items.value = [...page.files, ...older];
-    if (!older.length) nextCursor.value = page.nextCursor;
+    items.value = [...page.files, ...older].sort(galleryOrder);
+    if (usesPhotoOrder() || !older.length) nextCursor.value = page.nextCursor;
     pendingNew.value = 0;
   });
   pending = null;
@@ -138,6 +147,15 @@ export async function refresh(): Promise<void> {
   void loadTags();
   try {
     const page = await api<Page>(listQuery(48), { signal: controller.signal });
+    // An old photo inserted on another device can land below the first page.
+    // Refresh the already loaded span, never download originals or the unseen library.
+    if (usesPhotoOrder() && loadedBoundary) {
+      while (page.nextCursor && page.files.length && photoOrder(page.files.at(-1)!, loadedBoundary) < 0) {
+        const more = await api<Page>(listQuery(200, page.nextCursor), { signal: controller.signal });
+        if (request !== token) return;
+        page.files.push(...more.files); page.nextCursor = more.nextCursor;
+      }
+    }
     if (request !== token) return;
     const known = new Set(items.peek().map((file) => file.id));
     const added = page.files.filter((file) => !known.has(file.id)).length;
@@ -156,7 +174,7 @@ export async function refresh(): Promise<void> {
 }
 function clear(): void {
   dataVersion++; fileUpdates.value = {};
-  controller?.abort(); token += 1; authVersion += 1; pending = null; lastRefresh = -Infinity;
+  controller?.abort(); token += 1; authVersion += 1; pending = null; loadedBoundary = undefined; lastRefresh = -Infinity;
   batch(() => { items.value = []; localItems.value = []; clearPreviews(); nextCursor.value = null; status.value = 'idle'; errorMessage.value = ''; loadMoreError.value = ''; tags.value = []; settings.value = null; firstPageLoaded.value = false; resetUI(); });
 }
 effect(() => {

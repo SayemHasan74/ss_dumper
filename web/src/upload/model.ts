@@ -1,4 +1,4 @@
-import type { FileDTO } from '../../../shared/types';
+import type { FileDTO, PhotoDate } from '../../../shared/types';
 
 export type Intent = 'run' | 'pause' | 'cancel';
 export type Phase = 'pending' | 'hashing' | 'checking' | 'preparing' | 'original' | 'thumbnail' | 'completed' | 'cancelled';
@@ -13,6 +13,7 @@ export interface UploadJob {
   thumbnail: 'needed' | 'stored' | 'confirmed' | 'none'; thumbBytes: number;
   width: number | null; height: number | null;
   uncertain: boolean; thumbUncertain: boolean; duplicate: boolean; canonical?: string;
+  photoDate?: PhotoDate;
   attempt: number; nextRetry: number; error: string; cleanup: boolean;
 }
 export interface Fence { owner: string; generation: number; expires: number }

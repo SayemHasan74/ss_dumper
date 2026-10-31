@@ -2,7 +2,7 @@ import { signal } from '@preact/signals';
 import type { FileDTO } from '../../../shared/types';
 import { authState } from '../auth';
 import { api, ApiError } from '../lib/api';
-import { dataVersion, fileUpdates, items, loadFirstPage, loadTags, settings, trashMode } from './files';
+import { dataVersion, fileUpdates, galleryOrder, items, loadFirstPage, loadTags, settings, trashMode } from './files';
 import { clearSelection, updateSelectionFiles } from './selection';
 import { showToast } from './ui';
 
@@ -23,7 +23,7 @@ export async function bulkAction(action: Action, files: FileDTO[], tag?: string)
     if (action === 'pin' || action === 'unpin') return { ...file, pinned: action === 'pin', expiresAt: action === 'pin' || !settings.peek()?.autoExpireDays ? null : file.createdAt + settings.peek()!.autoExpireDays * 86400000 };
     return { ...file, tags: action === 'tag_add' ? [...new Set([...file.tags, tag!])].slice(0, 5).sort() : file.tags.filter((value) => value !== tag) };
   };
-  items.value = action === 'restore' && !mode ? [...items.peek().filter((file) => !ids.has(file.id)), ...files.map((file) => ({ ...file, deletedAt: null, expiresAt: file.pinned || !settings.peek()?.autoExpireDays ? null : file.createdAt + settings.peek()!.autoExpireDays * 86400000 }))].sort((a, b) => b.id.localeCompare(a.id)) : destructive ? items.peek().filter((file) => !ids.has(file.id)) : items.peek().map(optimistic);
+  items.value = action === 'restore' && !mode ? [...items.peek().filter((file) => !ids.has(file.id)), ...files.map((file) => ({ ...file, deletedAt: null, expiresAt: file.pinned || !settings.peek()?.autoExpireDays ? null : file.createdAt + settings.peek()!.autoExpireDays * 86400000 }))].sort(galleryOrder) : destructive ? items.peek().filter((file) => !ids.has(file.id)) : items.peek().map(optimistic);
   if (!destructive) updateSelectionFiles(files.map(optimistic));
   if (!destructive) fileUpdates.value = { ...fileUpdates.peek(), ...Object.fromEntries(files.filter((file) => !loadedIds.has(file.id)).map((file) => [file.id, optimistic(file)])) };
   let affected = 0;
@@ -53,7 +53,7 @@ export async function bulkAction(action: Action, files: FileDTO[], tag?: string)
     if (version === dataVersion && authState.peek() === 'in' && mode === trashMode.peek()) {
       const restore = [...backups.values()].filter((file) => !completed.has(file.id));
       const rollbackIds = new Set(restore.map((file) => file.id));
-      items.value = [...items.peek().filter((file) => !rollbackIds.has(file.id)), ...restore.filter((file) => loadedIds.has(file.id))].sort((a, b) => b.id.localeCompare(a.id));
+      items.value = [...items.peek().filter((file) => !rollbackIds.has(file.id)), ...restore.filter((file) => loadedIds.has(file.id))].sort(galleryOrder);
       updateSelectionFiles(restore);
       fileUpdates.value = { ...fileUpdates.peek(), ...Object.fromEntries(restore.filter((file) => !loadedIds.has(file.id)).map((file) => [file.id, file])) };
     }

@@ -14,7 +14,7 @@ import { errorMessage, firstPageLoaded, galleryItems as items, loadFirstPage, lo
 import { clearFilters, hasFilters, online, pendingNew } from '../store/ui';
 import { showPending } from '../store/files';
 import { Fab } from '../components/Fab';
-import { UploadTray } from '../components/UploadTray';
+import { UploadDock } from '../components/UploadDock';
 import { DropOverlay } from '../components/DropOverlay';
 import { busy, enqueue } from '../upload/queue';
 import '../upload/backfill';
@@ -101,7 +101,7 @@ export function Gallery() {
       {!trashMode.value && <Fab />}
       </>}
     </Workspace></div>
-    <aside class="action-stack" aria-label="Activity"><CopyQueue /><UploadTray /><Toast /></aside><ConfirmHost /><TagDialog /><EditDialog />
+    <aside class="action-stack" aria-label="Activity"><CopyQueue /><Toast /></aside><UploadDock /><ConfirmHost /><TagDialog /><EditDialog />
     <DropOverlay />
     {id && (Viewer ? <Viewer /> : <div class="viewer-loading" role="status"><span>{viewerError ? "Couldn't open viewer." : 'Opening viewer…'}</span>{viewerError && <button class="text-button" onClick={importViewer}>Retry</button>}<button class="icon-button" aria-label="Close viewer" onClick={closeViewer}><Icon name="close" /></button></div>)}
   </>;
