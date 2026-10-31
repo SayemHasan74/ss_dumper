@@ -22,4 +22,10 @@ Reproduce using `scripts/test-upload-recovery.mjs` and its existing browser-runt
 
 ## Release
 
-Restore checkpoint: `checkpoint/before-workspace-files-2026-10-31`, based on `200bff15fe96247b09ee16fb65f35c719f0deac7`. Authorized deployment and live results are recorded after release. Credentials, personal files, screenshots, browser profiles and local state are not part of this commit.
+Restore checkpoint: `checkpoint/before-workspace-files-2026-10-31`, based on `200bff15fe96247b09ee16fb65f35c719f0deac7`, was pushed without changing the previous recovery checkpoint. Feature commit: `b78d5b9ab34c9338d2de2bb5688434a68e637ed6`, on `codex/part-1`. Staged secret/asset scanning, private environment-history and diff-whitespace checks passed. Credentials, personal files, screenshots, browser profiles and local state are not part of the commit.
+
+Authorized release: [Dump](https://dump.sayemhasan74.workers.dev), Worker version `5fa2bad8-ee58-4208-8a59-c9968fbeddef`. The first D1 preflight returned a Cloudflare 7403 API error; account/resource checks succeeded and a retry passed with no migrations required. Deployment then completed using the existing free bindings and unchanged credentials.
+
+Live HTTPS verified the current hashed frontend, CSP and anonymous denial; native IndexedDB retention/reload/explicit Resume; one accepted PNG original and thumbnail with no replay after reload; the Files filter; an HTML file with preserved bytes, octet-stream/attachment/nosniff/sandbox headers, and literal source that did not execute; both actual theme colors; and local theme persistence after reload. Only the two unique synthetic fixtures were trashed and purged. Existing files, Notes, server settings and credentials were not changed; unrelated original-file fetching was blocked during the check.
+
+Reload the app once to load the update. Choose Settings → Appearance to switch themes; Files is available in the sidebar and beside PDFs.
