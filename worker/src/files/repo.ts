@@ -8,7 +8,7 @@ export interface FileRow {
 }
 export interface ListFilter {
   limit: number; trash: boolean; cursor?: string; since?: string; until?: string;
-  type?: 'image' | 'pdf'; tag?: string; q?: string; pinned?: boolean;
+  type?: 'image' | 'pdf' | 'file'; tag?: string; q?: string; pinned?: boolean;
 }
 export interface FilePatch { name?: string; note?: string; pinned?: boolean; tags?: string[] }
 export type BulkAction = 'trash' | 'restore' | 'pin' | 'unpin' | 'tag_add' | 'tag_remove' | 'purge';
@@ -44,6 +44,7 @@ export function createRepo(db: D1Database) {
       if (filter.until !== undefined) { where.push('f.id <= ?'); values.push(filter.until); }
       if (filter.type === 'image') where.push("f.mime LIKE 'image/%'");
       if (filter.type === 'pdf') where.push("f.mime = 'application/pdf'");
+      if (filter.type === 'file') where.push("f.mime NOT LIKE 'image/%' AND f.mime != 'application/pdf'");
       if (filter.pinned) where.push('f.pinned = 1');
       if (filter.tag !== undefined) { where.push('f.id IN (SELECT file_id FROM file_tags WHERE tag = ?)'); values.push(filter.tag); }
       if (filter.q !== undefined) { where.push("f.name LIKE ? ESCAPE '\\'"); values.push(filter.q); }

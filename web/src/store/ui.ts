@@ -1,6 +1,6 @@
 import { computed, signal } from '@preact/signals';
 
-export interface Filters { type: 'all' | 'image' | 'pdf'; time: 'all' | 'today' | 'week'; pinned: boolean; tag: string; q: string }
+export interface Filters { type: 'all' | 'image' | 'pdf' | 'file'; time: 'all' | 'today' | 'week'; pinned: boolean; tag: string; q: string }
 const defaults: Filters = { type: 'all', time: 'all', pinned: false, tag: '', q: '' };
 export const filters = signal<Filters>({ ...defaults });
 export const hasFilters = computed(() => filters.value.type !== 'all' || filters.value.time !== 'all' || filters.value.pinned || !!filters.value.tag || !!filters.value.q);

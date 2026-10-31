@@ -54,7 +54,7 @@ function listFilter(context: Context<AppEnv>): ListFilter {
   if (query.pinned === '1') filter.pinned = true;
   if (query.cursor !== undefined) { if (!isUlid(query.cursor)) badRequest('cursor'); filter.cursor = query.cursor; }
   if (query.type !== undefined) {
-    if (query.type !== 'image' && query.type !== 'pdf') badRequest('type');
+    if (query.type !== 'image' && query.type !== 'pdf' && query.type !== 'file') badRequest('type');
     filter.type = query.type;
   }
   if (query.tag !== undefined) filter.tag = normalizeTag(query.tag);
@@ -90,8 +90,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
       if (existing) return ok(context, { duplicate: true, file: fileDTO(existing, settings) });
     }
     const { prefix, stream } = await peekPrefix(body, SNIFF_BYTES);
-    const mime = sniffMime(prefix);
-    if (!mime) { await stream.cancel(); throw new HttpError(415, 'UNSUPPORTED_TYPE', 'Unsupported file type.'); }
+    const mime = sniffMime(prefix) ?? 'application/octet-stream';
     const id = ulid();
     const key = `f/${id}`;
     const storage = storageFor(context.env);
@@ -100,7 +99,7 @@ export function fileRoutes(app: Hono<AppEnv>, cache: FileCaches): void {
     let decoded = 'file';
     const name = context.req.header('X-File-Name');
     if (name !== undefined && name.length <= 600) { try { decoded = decodeURIComponent(name); } catch { decoded = 'file'; } }
-    const row: FileRow = { id, name: sanitizeName(decoded, mime), mime, size, ...dims, thumb_size: 0, note: '', pinned: 0, created_at: ulidTime(id), deleted_at: null, tags: '[]' };
+    const row: FileRow = { id, name: sanitizeName(decoded, mime), mime, size, ...(mime.startsWith('image/') ? dims : {width:null,height:null}), thumb_size: 0, note: '', pinned: 0, created_at: ulidTime(id), deleted_at: null, tags: '[]' };
     try { await repo.insert(row, sha); }
     catch (error) {
       await storage.deleteMany([key]);

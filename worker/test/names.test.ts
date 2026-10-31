@@ -1,5 +1,12 @@
 import { expect, it } from 'vitest';
 import { sanitizeName } from '../src/files/validate';
+it('preserves general-file extensions and dotfiles while removing paths and control characters',()=>{
+  for(const name of ['README.md','index.html','types.d.ts','archive.tar.gz','.gitignore','without-extension'])expect(sanitizeName(name,'application/octet-stream')).toBe(name);
+  expect(sanitizeName('../../code/app.ts','application/octet-stream')).toBe('app.ts');
+  expect(sanitizeName('a\r\n<script>.html','application/octet-stream')).toBe('ascript.html');
+  expect(sanitizeName('..','application/octet-stream')).toBe('file');
+  const long=sanitizeName('ক'.repeat(300)+'.tsx','application/octet-stream');expect(long.endsWith('.tsx')).toBe(true);expect(Array.from(long)).toHaveLength(200);
+});
 
 it('removes paths, control characters, bidi formatting and invisible characters', () => {
   expect(sanitizeName('../../etc/passwd.png', 'image/png')).toBe('passwd.png');

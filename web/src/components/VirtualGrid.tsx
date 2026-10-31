@@ -28,11 +28,12 @@ export function VirtualGrid() {
       if (route.peek().view === 'viewer') return;
       const width = measured.current.width;
       if (!width) return;
-      const gap = width < 640 ? 3 : 6;
-      const minimum = width < 640 ? 104 : 148;
-      const cols = Math.max(2, Math.floor((width + gap) / (minimum + gap)));
+      const mobile = innerWidth <= 760;
+      const gap = mobile ? 12 : 14;
+      const minimum = 136;
+      const cols = mobile ? 2 : Math.max(2, Math.floor((width + gap) / (minimum + gap)));
       const cell = Math.floor((width - gap * (cols - 1)) / cols);
-      const rowHeight = cell + gap;
+      const rowHeight = cell + 48 + gap;
       const first = Math.max(0, Math.min(rows.current, Math.floor((scrollY - measured.current.top) / rowHeight) - 3));
       const last = Math.max(first, Math.min(rows.current, Math.ceil((scrollY + innerHeight - measured.current.top) / rowHeight) + 3));
       const value = { cols, cell, gap, first, last, rowHeight };
@@ -78,8 +79,9 @@ export function VirtualGrid() {
     setFocused(next);
     const metrics = gridMetrics.peek();
     const y = metrics.gridTop + Math.floor(next / layout.cols) * layout.rowHeight;
-    const sticky = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) + 60;
+    const style = getComputedStyle(document.documentElement);
+    const sticky = parseFloat(style.getPropertyValue('--header-height')) + parseFloat(style.getPropertyValue('--workspace-topbar-height')) + 60;
     if (y < scrollY + sticky) scrollTo({ top: Math.max(0, y - sticky), behavior: 'instant' });
     else if (y + layout.cell > scrollY + innerHeight) scrollTo({ top: y + layout.cell - innerHeight, behavior: 'instant' });
-  }}><div class="grid-window" style={{ top: `${layout.first * layout.rowHeight}px`, gridTemplateColumns: `repeat(${layout.cols}, ${layout.cell}px)`, gap: `${layout.gap}px` }}>{cells}</div></div>;
+  }}><div class="grid-window" style={{ top: `${layout.first * layout.rowHeight}px`, gridTemplateColumns: `repeat(${layout.cols}, ${layout.cell}px)`, gridAutoRows: `${layout.rowHeight-layout.gap}px`, gap: `${layout.gap}px` }}>{cells}</div></div>;
 }

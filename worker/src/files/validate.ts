@@ -6,7 +6,12 @@ export function badRequest(parameter: string): never { throw new HttpError(400, 
 export function sanitizeName(raw: string, mime: string): string {
   let name = raw.normalize('NFC').replace(/[\ud800-\udfff]/gu, '').split(/[\\/]/).at(-1) ?? '';
   name = name.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff/:*?"<>|\\]/g, '')
-    .replace(/\s+/gu, ' ').replace(/^[ .]+|[ .]+$/g, '') || 'file';
+    .replace(/\s+/gu, ' ').replace(mime==='application/octet-stream'?/^ +|[ .]+$/g:/^[ .]+|[ .]+$/g, '') || 'file';
+  if (mime === 'application/octet-stream') {
+    const dot=name.lastIndexOf('.'),ext=dot>0?name.slice(dot):'';
+    if(ext&&Array.from(ext).length<40)return Array.from(name.slice(0,dot)).slice(0,NAME_MAX-Array.from(ext).length).join('')+ext;
+    return Array.from(name).slice(0,NAME_MAX).join('');
+  }
   const dot = name.lastIndexOf('.');
   let ext = dot > 0 ? name.slice(dot) : '';
   const valid = ext.toLowerCase() === extForMime(mime) || (mime === 'image/jpeg' && ext.toLowerCase() === '.jpeg');

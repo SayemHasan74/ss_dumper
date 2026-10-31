@@ -9,6 +9,7 @@ import { showToast } from '../store/ui';
 import { confirmAction } from '../components/Dialog';
 import { Icon } from '../components/Icon';
 import { canInstall, installApp, installBusy, installed } from '../pwa/install';
+import { theme, setTheme, type Theme } from '../store/theme';
 
 export function Settings() {
   const [stats, setStats] = useState<StatsDTO | null>(null), [error, setError] = useState(false), [saving, setSaving] = useState(false);
@@ -38,6 +39,7 @@ export function Settings() {
   const uploadUrl = `${location.origin}/api/upload`;
   return <><header class="app-header"><div class="header-row page-width"><button class="icon-button" aria-label="Back to gallery" onClick={() => navigate('/')}><Icon name="chevron-left" /></button><h1 class="app-title">Settings</h1><span /></div></header><main class="settings-page page-width">
     {error && <p role="status">Couldn't load settings. <button class="text-button" onClick={() => void load()}>Retry</button></p>}
+    <section><h2>Appearance</h2><label>Color theme<select aria-label="Color theme" value={theme.value} onChange={event=>setTheme(event.currentTarget.value as Theme)}><option value="system">Follow system</option><option value="dark">Charcoal dark</option><option value="light">Cream light</option></select></label></section>
     <section><h2>Storage</h2>{stats ? <><progress class={ratio > .95 ? 'usage danger' : ratio > .8 ? 'usage warning' : 'usage'} max={1} value={Math.min(1, ratio)} aria-label="Storage used" /><p>{bytes(stats.bytes + stats.trashBytes)} of {bytes(stats.capBytes)} · {stats.count} files; Trash {bytes(stats.trashBytes)}</p></> : <p>Loading…</p>}<p class="form-hint">Free plan: about 500 uploads per day (original + thumbnail; fewer with retries). Writes, deletes and lists each have a separate 1,000/day limit, resetting at 00:00 UTC = 06:00 Dhaka.</p></section>
     <section><h2>Auto-delete</h2><label>Move unpinned files to Trash after<select disabled={saving || !settings.value} value={settings.value?.autoExpireDays ?? 30} onChange={(event) => void save({ autoExpireDays: Number(event.currentTarget.value) })}>{[0, 7, 14, 30, 60, 90].map((days) => <option value={days} key={days}>{days ? `${days} days after upload` : 'Never'}</option>)}</select></label></section>
     <section><h2>Trash retention</h2><label>Delete trashed files forever after<select disabled={saving || !settings.value} value={settings.value?.trashDays ?? 7} onChange={(event) => void save({ trashDays: Number(event.currentTarget.value) })}>{[1, 3, 7, 14, 30].map((days) => <option value={days} key={days}>{days} days</option>)}</select></label></section>

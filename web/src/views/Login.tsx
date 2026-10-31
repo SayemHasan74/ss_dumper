@@ -43,25 +43,25 @@ export function Login() {
   }
   return (
     <main class="auth-layout">
-      <section class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-7 dark:border-slate-800 dark:bg-slate-900" aria-labelledby="login-title">
+      <section class="auth-card" aria-labelledby="login-title">
         <h1 id="login-title" class="text-3xl font-semibold tracking-tight">Dump</h1>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Your files, within reach. Sign in with your access key.</p>
+        <p class="mt-2 text-sm auth-description">Your files, within reach. Sign in with your access key.</p>
         <form class="mt-7" onSubmit={submit} aria-busy={pending}>
           <input class="sr-only" type="text" name="username" autoComplete="username" value="dump" tabIndex={-1} readOnly aria-label="Username" />
           <label class="mb-2 block text-sm font-medium" for="access-key">Access key</label>
-          <div class="flex rounded-lg border border-slate-400 bg-transparent focus-within:ring-2 focus-within:ring-indigo-500 dark:border-slate-500">
+          <div class="auth-key-field">
             <input ref={input} id="access-key" class="min-w-0 flex-1 rounded-lg bg-transparent px-3 py-3 outline-none" {...(visible ? { type: 'text' as const } : { type: 'password' as const })} name="key" autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellcheck={false} disabled={disabled} aria-describedby="login-error" />
-            <button class="min-h-11 min-w-11 rounded-lg px-3 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide access key' : 'Show access key'} aria-pressed={visible} disabled={disabled}>
+            <button class="min-h-11 min-w-11 rounded-lg px-3 auth-key-toggle" type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide access key' : 'Show access key'} aria-pressed={visible} disabled={disabled}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
                 <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
                 {visible && <path d="m3 3 18 18" />}
               </svg>
             </button>
           </div>
-          <p id="login-error" class="mt-3 min-h-10 text-sm text-red-700 dark:text-red-300" aria-live="polite" aria-atomic="true">
+          <p id="login-error" class="mt-3 min-h-10 text-sm danger-text" aria-live="polite" aria-atomic="true">
             {seconds > 0 ? `Too many attempts. Try again in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.` : error}
           </p>
-          <button class="mt-2 min-h-12 w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={disabled}>{pending ? 'Checking…' : 'Sign in'}</button>
+          <button class="primary-button mt-2 disabled:opacity-60" type="submit" disabled={disabled}>{pending ? 'Checking…' : 'Sign in'}</button>
         </form>
       </section>
     </main>

@@ -2,7 +2,7 @@
 
 ## What it is
 
-Dump is a private, single-user screenshot and file inbox. Upload on your phone, then copy, download or manage the same files from any browser. It supports PNG, JPEG, WebP, GIF and PDF; no registration, sharing or public file links.
+Dump is a private, single-user screenshot and file inbox. Upload on your phone, then copy, download or manage the same files from any browser. Images and PDFs have dedicated views; the **Files** section accepts other formats including Markdown, HTML, TypeScript, archives and binary files. No registration, sharing or public file links.
 
 Deployed URL: https://dump.sayemhasan74.workers.dev. Frontend and API are served by the same Cloudflare Worker. Sign in with the access key saved in your password manager. See the [deployment verification and phone checklist](docs/verification/deployment.md).
 
@@ -106,12 +106,14 @@ Follow [the complete iPhone Shortcut guide](docs/ios-shortcut.md) for Share Shee
 
 ## Daily use
 
+The workspace has a persistent desktop sidebar, top search, and a rounded gallery with filename/size captions. Phones use a compact navigation dialog and a two-column gallery. In **Settings → Appearance**, choose **Follow system**, **Charcoal dark**, or **Cream light**. Only this nonsensitive preference is stored locally; choosing a theme does not change files, Notes or upload recovery. No AI controls or decorative rainbow effects are included.
+
 The gallery shows **Total photos** across all saved images, including those not yet loaded by scrolling. It excludes PDFs, pending uploads and Trash, and refreshes after uploads or file actions finish. Counts use the existing cached stats endpoint and may lag changes made on other devices by up to 60 seconds.
 
-- Tap **+** and choose up to 100 supported files, at most 25 MiB each. Desktop also supports drop and paste outside editors. iOS includes its normal extra picker tap.
+- Tap **+** and choose files of any type, each nonempty and at most 25 MiB. Selections over 100 open review and can queue in groups, preserving the remainder. Desktop also supports dropping files and pasting images outside editors. iOS includes its normal extra picker tap.
 - Queued images use placeholders or small thumbnails, never full-size original previews. Uploads has Pause, Resume, Retry, Cancel and retained-file history. One shared preparation slot and one touch/slow/data-saving upload chain limit phone memory use; desktop uses up to three chains. Keep the app visible for transfers; retained files can wait until reopening.
 - Filter by name, date, file type, pin or tag. Scrolling uses a virtualized grid; refresh merges new files while preserving older pages. The new-files pill lets you choose when to insert items while scrolled down.
-- Open a file for its original. Use arrows/swipes, zoom/pan or open/download PDFs. Back/Escape closes the viewer.
+- Open a file for its original. Use arrows/swipes, zoom/pan or open/download PDFs. Other file types download with their original sanitized filename; supported UTF-8 source files up to 256 KiB can be previewed and copied as literal text. HTML, scripts, SVG and Markdown are never executed/rendered as active content. Larger or binary files remain downloadable. Back/Escape closes the viewer.
 - Tap **Select**, long-press a cell, or use desktop Ctrl/Cmd-click and Shift-click. Select loaded items or Everything matching (up to 2,000).
 - **Copy** one screenshot and paste into a chat. Multiple images use Copy next, one clipboard image at a time. “One image” combines chronological screenshots into white PNG sheets (up to six per sheet, with canvas size limits). The browser cannot put several independent images into most destination apps in one paste.
 - Download one original or a ZIP of selected files up to 300 MiB combined. Share appears only when the browser can share those actual files (up to ten).
@@ -137,7 +139,7 @@ See [recovery verification and the real-phone checklist](docs/verification/resum
 
 ## Notes across devices
 
-Open **Notes**, immediately beside PDFs, or go directly to [your private Notes screen](https://dump.sayemhasan74.workers.dev/#/notes). Tap **+ Add block**, then type or paste plain text. Changes save after a short pause; another visible Notes screen picks them up within about four seconds. Cutting or clearing text saves an empty block and clears it on your other devices. Use the Copy button or normal text selection; Delete permanently removes a block after confirmation.
+Open **Notes** beside Files, or go directly to [your private Notes screen](https://dump.sayemhasan74.workers.dev/#/notes). Tap **+ Add block**, then type or paste plain text. Changes save after a short pause; another visible Notes screen picks them up within about four seconds. Cutting or clearing text saves an empty block and clears it on your other devices. Use the Copy button or normal text selection; Delete permanently removes a block after confirmation.
 
 There is no editor character limit or per-block application text cap. Text is split into small D1 rows and bounded requests, including blocks larger than D1's individual 2 MB row limit. Notes share the existing database's storage and free-plan read/write/request quotas; browser memory and platform capacity remain finite. Notes use no KV operations. They are separate from files, are not included in file storage/photo counts, and are never auto-expired or moved to file Trash. Your D1 metadata backup includes notes; file ZIP downloads do not.
 

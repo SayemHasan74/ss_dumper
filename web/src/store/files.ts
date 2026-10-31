@@ -3,6 +3,7 @@ import type { FileDTO, SettingsDTO } from '../../../shared/types';
 import { authState } from '../auth';
 import { api } from '../lib/api';
 import { filters, gridMetrics, online, pendingNew, resetUI, showToast } from './ui';
+import { matchesFileType } from '../lib/file-type';
 
 interface Page { files: FileDTO[]; nextCursor: string | null }
 export const items = signal<FileDTO[]>([]);
@@ -19,7 +20,7 @@ export const firstPageLoaded = signal(false);
 export type UploadStatus = 'queued' | 'hashing' | 'checking' | 'preparing' | 'uploading' | 'waiting' | 'failed' | 'done' | 'duplicate' | 'cancelled';
 export interface LocalFile extends FileDTO { localId: string; status: UploadStatus; progress: number; previewUrl: string; message: string }
 export const localItems = signal<LocalFile[]>([]);
-export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...(trashMode.value ? [] : localItems.value), ...items.value]);
+export const galleryItems = computed<(FileDTO | LocalFile)[]>(() => [...(trashMode.value ? [] : localItems.value.filter(file=>matchesFileType(file.mime,filters.value.type))), ...items.value]);
 export const previewById = signal<Record<string, string>>({});
 export function clearPreviews(): void {
   for (const url of Object.values(previewById.peek())) URL.revokeObjectURL(url);
@@ -31,7 +32,7 @@ export function acceptUpload(file: FileDTO, preview = ''): void {
     if (previous && previous !== preview) URL.revokeObjectURL(previous);
     previewById.value = { ...previewById.peek(), [file.id]: preview };
   }
-  if (trashMode.peek()) return;
+  if (trashMode.peek() || !matchesFileType(file.mime,filters.peek().type)) return;
   items.value = [file, ...items.peek().filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));
   if (pending) {
     pending.files = [file, ...pending.files.filter((item) => item.id !== file.id)].sort((a, b) => b.id.localeCompare(a.id));

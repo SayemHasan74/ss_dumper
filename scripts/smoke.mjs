@@ -75,10 +75,16 @@ try {
     const existing = await json('/api/upload/check',{method:'POST',bearer:true,json:{hashes:[sha(first.bytes)]}});
     check(existing.existing[sha(first.bytes)] === first.file.id, 'Preflight failed.');
     const before = await json('/api/stats');
-    check((await request('/api/upload',{method:'POST',bearer:true,bytes:Buffer.from('<svg>not an allowed image</svg>')})).status === 415,'SVG accepted.');
+    for(const [name,bytes] of [[`${prefix}.svg`,Buffer.from('<svg><script>throw 1</script></svg>')],[`${prefix}.bin`,Buffer.from([255,216,255])]]){
+      const file=await add(name,bytes,'text/html');
+      check(file.file.mime==='application/octet-stream'&&file.file.name===name,'General file type/name not preserved safely.');
+      const response=await request(`/api/files/${file.file.id}/original`);
+      check(response.headers.get('Content-Type')==='application/octet-stream'&&response.headers.get('Content-Disposition').startsWith('attachment;')&&response.headers.get('Content-Security-Policy')==="default-src 'none'; sandbox",'General file was not an inert download.');
+      check(Buffer.from(await response.arrayBuffer()).equals(bytes),'General file bytes changed.');
+      await json(`/api/files/${file.file.id}`,{method:'DELETE'});await json(`/api/files/${file.file.id}/permanent`,{method:'DELETE'});created.delete(file.file.id);
+    }
     check((await json('/api/stats')).count === before.count,'Rejected upload changed stats.');
     check((await request('/api/upload',{method:'POST',bearer:true,bytes:Buffer.alloc(26*1024*1024)})).status === 413,'Oversized upload accepted.');
-    check((await request('/api/upload',{method:'POST',bearer:true,bytes:Buffer.from([255,216,255])})).status === 415,'Short upload accepted.');
   });
   await step('3 JPEG thumbnail upload', async () => {
     const thumb = await json(`/api/thumb?id=${first.file.id}`,{method:'POST',bearer:true,bytes:Buffer.from([255,216,255,224,0,16,74,70,73,70,0,0])});

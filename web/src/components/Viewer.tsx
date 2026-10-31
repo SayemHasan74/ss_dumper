@@ -13,6 +13,7 @@ import { downloadFiles } from '../lib/zip';
 import { shareableFiles, shareFiles } from '../lib/share';
 import { confirmAction, dialogCount } from './Dialog';
 import { openEdit } from './EditDialog';
+import { TextPreview } from './TextPreview';
 
 export function Viewer() {
   const id = route.value.id!;
@@ -70,6 +71,7 @@ export function Viewer() {
     const keydown = (event: KeyboardEvent) => {
       if (dialogCount.peek() || copyQueue.peek()) return;
       if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) return;
+      if (event.target instanceof Element && event.target.closest('.source-preview') && !['Escape','Tab'].includes(event.key)) return;
       const current = currentFile.current;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && current && eligible(current)) { event.preventDefault(); startCopy([current]); }
       if ((event.key === 'Delete' || event.key === 'Backspace') && current) { event.preventDefault(); void removeCurrent(current.deletedAt !== null); }
@@ -141,7 +143,7 @@ export function Viewer() {
     <div class="viewer-sheet" style={{ transform: `translateY(${dragY}px)` }}>
       <header class="viewer-top"><button ref={close} class="icon-button" aria-label="Close viewer" onClick={closeViewer}><Icon name="close" /></button><span class="viewer-name">{file?.name ?? 'Loading…'}</span>{index >= 0 && <span class="viewer-counter">{index + 1} / {list.length}</span>}</header>
       {file && <div class="viewer-actions" role="toolbar" aria-label="File actions">{file.deletedAt ? <><button class="action-button" onClick={async () => { if (await bulkAction('restore', [file])) closeViewer(); }}>Restore</button><button class="action-button" onClick={() => void removeCurrent(true)}>Delete forever</button></> : <>
-        <button class="action-button" disabled={!eligible(file)} title={!eligible(file) ? "PDFs can't be copied. Use Download." : 'Copy image'} onClick={() => startCopy([file])}><Icon name="copy" />Copy</button><button class="action-button" onClick={() => void downloadFiles([file])}><Icon name="download" />Download</button>{shared && <button class="action-button" onClick={() => shareFiles(shared)}><Icon name="share" />Share</button>}<button class="action-button" onClick={() => void bulkAction(file.pinned ? 'unpin' : 'pin', [file])}><Icon name="pin" />{file.pinned ? 'Unpin' : 'Pin'}</button><button class="action-button" onClick={() => openEdit(file)}><Icon name="edit" />Edit</button><button class="action-button" onClick={() => void removeCurrent()}><Icon name="trash" />Delete</button>
+        <button class="action-button" disabled={!eligible(file)} title={!eligible(file) ? 'Use Download or the source preview for this file.' : 'Copy image'} onClick={() => startCopy([file])}><Icon name="copy" />Copy</button><button class="action-button" onClick={() => void downloadFiles([file])}><Icon name="download" />Download</button>{shared && <button class="action-button" onClick={() => shareFiles(shared)}><Icon name="share" />Share</button>}<button class="action-button" onClick={() => void bulkAction(file.pinned ? 'unpin' : 'pin', [file])}><Icon name="pin" />{file.pinned ? 'Unpin' : 'Pin'}</button><button class="action-button" onClick={() => openEdit(file)}><Icon name="edit" />Edit</button><button class="action-button" onClick={() => void removeCurrent()}><Icon name="trash" />Delete</button>
       </>}</div>}
       <div class={zoom ? 'viewer-stage zoomed' : 'viewer-stage'} onClick={(event) => { if (Date.now() >= suppressClick.current && (event.target === event.currentTarget || (event.target as HTMLElement).classList.contains('viewer-fit')) && !zoom) closeViewer(); }} onTouchStart={(event) => {
         touch.current = !zoom && event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
@@ -172,7 +174,7 @@ export function Viewer() {
           {!decoded && !imageError && (!file.thumbSize || thumbFailed) && <div class="viewer-state"><span class="spinner" aria-label="Loading image" /></div>}
           {imageError && <div class="viewer-state"><p>Couldn't load image</p><button class="viewer-button" onClick={retryLoad}>Retry</button></div>}
           {decoded && <button class="viewer-zoom" onClick={() => setZoom(!zoom)} aria-pressed={zoom}>{zoom ? 'Fit image' : 'Actual size'}</button>}
-        </> : <div class="pdf-card"><Icon name="file-pdf" size={44} /><h2>{file.name}</h2><p>{bytes(file.size)}</p><div><a class="viewer-button" href={`/api/files/${file.id}/original`} target="_blank" rel="noopener">Open</a><a class="viewer-button secondary" href={`/api/files/${file.id}/original?download=1`}>Download</a></div></div>}
+        </> : <div class={file.mime==='application/pdf'?'pdf-card':'pdf-card generic-file-card'}><Icon name={file.mime==='application/pdf'?'file-pdf':'file'} size={44} /><h2>{file.name}</h2><p>{bytes(file.size)}</p><div>{file.mime==='application/pdf'&&<a class="viewer-button" href={`/api/files/${file.id}/original`} target="_blank" rel="noopener">Open</a>}<a class="viewer-button secondary" href={`/api/files/${file.id}/original?download=1`}>Download</a></div>{file.mime!=='application/pdf'&&<TextPreview file={file}/>}</div>}
         {index >= 0 && <><button class="viewer-chevron previous icon-button" aria-label="Previous file" disabled={index === 0} onClick={() => move(-1)}><Icon name="chevron-left" size={28} /></button><button class="viewer-chevron next icon-button" aria-label="Next file" disabled={index === list.length - 1} onClick={() => move(1)}><Icon name="chevron-right" size={28} /></button></>}
       </div>
       {file && <footer class="viewer-info"><p>{bytes(file.size)}{file.width && file.height ? ` · ${file.width} × ${file.height}` : ''}<span class="info-divider">·</span><time dateTime={new Date(file.createdAt).toISOString()}>{dateTime(file.createdAt)}</time></p>{file.pinned && !!settings.value?.autoExpireDays ? <p>Pinned — never expires</p> : file.expiresAt && file.expiresAt - Date.now() <= 14 * 86400000 ? <p>Expires in {Math.max(0, Math.ceil((file.expiresAt - Date.now()) / 86400000))} days</p> : null}{file.tags.length > 0 && <div class="viewer-tags">{file.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}{file.note && <p class="viewer-note">{file.note}</p>}</footer>}

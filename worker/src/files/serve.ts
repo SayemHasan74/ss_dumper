@@ -15,10 +15,10 @@ export async function serveFile(context: Context<AppEnv>, row: FileRow, thumbnai
   const headers = new Headers({
     ETag: etag, 'Accept-Ranges': 'none',
     'Content-Type': thumbnail ? 'image/jpeg' : row.mime,
-    'Content-Disposition': contentDisposition(row.name, context.req.query('download') === '1'),
+    'Content-Disposition': contentDisposition(row.name, row.mime === 'application/octet-stream' || context.req.query('download') === '1'),
     'Cache-Control': 'private, max-age=31536000, immutable', Vary: 'Cookie, Authorization',
   });
-  if (thumbnail || row.mime.startsWith('image/')) headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  if (thumbnail || row.mime !== 'application/pdf') headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
   const conditional = context.req.header('If-None-Match');
   if (conditional?.split(',').some((value) => value.trim() === '*' || value.trim().replace(/^W\//, '') === etag)) return new Response(null, { status: 304, headers });
   headers.set('Content-Length', String(thumbnail ? row.thumb_size : row.size));

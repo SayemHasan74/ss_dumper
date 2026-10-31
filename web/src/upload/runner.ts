@@ -233,7 +233,7 @@ async function runJob(id: string, token: Attempt): Promise<void> {
       assertAttempt(id, token);
       if (checked.existing[job.hash]) {
         const metadata = await remote<{ file: FileDTO }>(`/api/files/${checked.existing[job.hash]}`, token);
-        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: metadata.file, duplicate: true, phase: 'thumbnail', thumbnail: metadata.file.thumbSize ? 'confirmed' : job.thumbnail }, token);
+        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: metadata.file, duplicate: true, phase: 'thumbnail', thumbnail: !metadata.file.mime.startsWith('image/') ? 'none' : metadata.file.thumbSize ? 'confirmed' : job.thumbnail }, token);
       } else {
         const blob = original ?? files.get(id) ?? await db.getBlob(id);
         if (!blob || blob.size !== job.size) throw new db.LocalStoreError('missing', 'Original file needed.');
@@ -242,7 +242,7 @@ async function runJob(id: string, token: Attempt): Promise<void> {
         job = await checkpoint(job, { phase: 'original', uncertain: true }, token);
         const response = await remote<{ file: FileDTO; duplicate: boolean }>('/api/upload', token, file, { 'Content-Type':job.mime || 'application/octet-stream', 'X-File-Name':encodeURIComponent(job.name), 'X-Content-Sha256':job.hash, ...(job.width && job.height ? { 'X-Width':String(job.width), 'X-Height':String(job.height) } : {}) }, value => { if (active.get(id) === token && !token.controller.signal.aborted) { progress.value = { ...progress.peek(), [id]:value }; } });
         if (!response.file?.id || typeof response.file.size !== 'number') throw new UploadError(0,'INTERNAL');
-        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: response.file, duplicate: response.duplicate, phase: 'thumbnail', thumbnail: response.file.thumbSize ? 'confirmed' : job.thumbnail, attempt: 0 }, token);
+        job = await checkpoint(job, { originalConfirmed: true, uncertain: false, server: response.file, duplicate: response.duplicate, phase: 'thumbnail', thumbnail: !response.file.mime.startsWith('image/') ? 'none' : response.file.thumbSize ? 'confirmed' : job.thumbnail, attempt: 0 }, token);
       }
     }
     if (job.thumbnail === 'stored' && job.retention === 'retained') job = await checkpoint(job, { retention:'released' }, token, { dropOriginal:true });

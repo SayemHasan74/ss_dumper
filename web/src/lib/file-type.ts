@@ -1,0 +1,3 @@
+export const fileExtension = (name:string):string => name.split('.').length>1 ? name.split('.').at(-1)!.replace(/[^a-z0-9]/gi,'').slice(0,8).toUpperCase() || 'FILE' : 'FILE';
+export const textPreviewable = (name:string):boolean => /\.(md|mdx|txt|html?|tsx?|jsx?|json|css|scss|ya?ml|toml|xml|svg|sql|sh|py|rs|go|c|cpp|h|java|log|csv|ini|conf)$/i.test(name) || /^\.(gitignore|env|editorconfig)$/i.test(name);
+export const matchesFileType = (mime:string,type:'all'|'image'|'pdf'|'file'):boolean => type==='all'||(type==='image'?mime.startsWith('image/'):type==='pdf'?mime==='application/pdf':!mime.startsWith('image/')&&mime!=='application/pdf');

@@ -9,11 +9,11 @@ import type { Storage } from '../src/files/storage';
 
 afterEach(() => vi.restoreAllMocks());
 const row: FileRow = { id:'01K8AZ40000000000000000000',name:'photo.png',mime:'image/png',size:16,width:null,height:null,thumb_size:12,note:'',pinned:0,created_at:0,deleted_at:null,tags:'[]' };
-function fixture(missing = false, thumbnail = false) {
+function fixture(missing = false, thumbnail = false, file = row) {
   const get = vi.fn(async () => missing ? null : {body:new ReadableStream<Uint8Array>({start(c){c.enqueue(new Uint8Array(16));c.close();}}),meta:{size:16,at:0}});
   const app = new Hono<AppEnv>();
   app.use('*',securityHeaders);
-  app.get('/file',c=>serveFile(c,row,thumbnail,{get} as unknown as Storage));
+  app.get('/file',c=>serveFile(c,file,thumbnail,{get} as unknown as Storage));
   app.onError((error,c)=>fail(c,error instanceof HttpError ? error : new HttpError(500,'INTERNAL','Internal error.')));
   return {get,request:(init:RequestInit={})=>app.request('https://dump.test/file',init)};
 }
@@ -59,4 +59,14 @@ it('encodes header values safely for quotes, CR/LF and Unicode', () => {
   expect(header).not.toMatch(/[\r\n]/);
   expect(header).toContain("filename*=UTF-8''");
   expect(header).toContain('%22%0D%0A');
+});
+it('forces untrusted general files to inert attachment downloads, including HTML and SVG names',async()=>{
+  for(const name of ['page.html','drawing.svg','source.ts','README.md','archive.zip']){
+    const response=await fixture(false,false,{...row,name,mime:'application/octet-stream'}).request();
+    expect(response.headers.get('Content-Type')).toBe('application/octet-stream');
+    expect(response.headers.get('Content-Disposition')).toMatch(/^attachment;/);
+    expect(response.headers.get('Content-Security-Policy')).toBe("default-src 'none'; sandbox");
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    await response.body?.cancel();
+  }
 });
