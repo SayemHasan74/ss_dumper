@@ -51,4 +51,12 @@ No physical iPhone/Safari, iOS process termination, OS-level storage eviction or
 
 ## Release
 
-The pre-change local checkpoint is `checkpoint/before-dock-photo-order-2026-10-31` at `be8320c`. Deployment and live verification are recorded below after release.
+The pre-change checkpoint `checkpoint/before-dock-photo-order-2026-10-31` at `be8320c` is pushed to GitHub. Implementation commit: `33632b6` on `codex/part-1`.
+
+- `npm run deploy` passed. Additive migration `0003_photo_dates.sql` applied successfully to the existing D1 database. Existing KV/D1 bindings, credentials and cron were preserved.
+- Live URL: https://dump.sayemhasan74.workers.dev
+- Worker version: `0b68baf8-4c06-46f9-aeff-53baf37d57e6`.
+- Live phone-viewport check used a fresh browser context and one uniquely named synthetic PNG with an explicit 2020 capture timestamp. It verified collapse/Pause/reload/Resume directly from the dock without changing routes, persisted capture metadata, exactly one accepted original and one thumbnail, no retransmission after another reload, upload-time filtering and unchanged upload-based expiry. The live metadata response remained no-store and anonymous collection access returned 401.
+- Only the synthetic fixture was trashed and permanently removed afterward. No personal original was downloaded or rewritten. No physical iPhone test was performed.
+
+To restore the prior application code, use the checkpoint through the normal Git workflow; do not clear local queues or drop the additive columns. The prior Worker tolerates these additional columns and their defaults. Keep the existing secrets and deployed resource bindings private and unchanged.
